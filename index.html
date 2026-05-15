@@ -3,15 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    
-    <title>サッカーパズル - Ultimate Tactics Edition</title>
+    <title>サッカーパズル - Dynamic AI Edition</title>
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
     <style>
-        /* 横画面になった時の強制ブロック画面 */
         @media screen and (orientation: landscape) {
             body::before {
                 content: "スマホを たて にして あそんでね！";
@@ -27,12 +24,8 @@
 </head>
 <body>
     <script>
-        // --- データ管理ユーティリティ ---
         const StorageManager = {
-            getSaved: () => {
-                try { return JSON.parse(localStorage.getItem('soccer_puzzle_saved_stages')) || []; } 
-                catch(e) { return []; }
-            },
+            getSaved: () => { try { return JSON.parse(localStorage.getItem('soccer_puzzle_saved_stages')) || []; } catch(e) { return []; } },
             toggleSave: (stageNum) => {
                 try {
                     let saved = StorageManager.getSaved();
@@ -43,31 +36,26 @@
                     return saved.includes(stageNum);
                 } catch(e) { return false; }
             },
-            getHighestStage: () => {
-                try { return parseInt(localStorage.getItem('soccer_highest_stage')) || 1; }
-                catch(e) { return 1; }
-            },
+            getHighestStage: () => { try { return parseInt(localStorage.getItem('soccer_highest_stage')) || 1; } catch(e) { return 1; } },
             updateHighestStage: (stageNum) => {
                 try {
                     const current = StorageManager.getHighestStage();
-                    if (stageNum > current && stageNum <= 10) {
-                        localStorage.setItem('soccer_highest_stage', stageNum);
-                    }
+                    if (stageNum > current && stageNum <= 10) localStorage.setItem('soccer_highest_stage', stageNum);
                 } catch(e) {}
             }
         };
 
         const STAGE_CONFIG = {
-            1: { player: { x: 195, y: 650 }, passer: { x: 195, y: 750 }, decoy: { x: 80, y: 650, target: { x: 50, y: 150 } }, enemies: [{ x: 100, y: 400 }] },
-            2: { player: { x: 195, y: 650 }, passer: { x: 195, y: 750 }, decoy: { x: 300, y: 650, target: { x: 320, y: 150 } }, enemies: [{ x: 280, y: 400 }] },
-            3: { player: { x: 195, y: 650 }, passer: { x: 195, y: 750 }, decoy: { x: 80, y: 650, target: { x: 50, y: 150 } }, enemies: [{ x: 100, y: 450 }, { x: 280, y: 300 }] },
-            4: { player: { x: 100, y: 650 }, passer: { x: 195, y: 750 }, decoy: { x: 300, y: 600, target: { x: 320, y: 250 } }, enemies: [{ x: 120, y: 400 }] },
-            5: { player: { x: 280, y: 650 }, passer: { x: 195, y: 750 }, decoy: { x: 80, y: 600, target: { x: 50, y: 250 } }, enemies: [{ x: 260, y: 400 }] },
-            6: { player: { x: 195, y: 650 }, passer: { x: 195, y: 750 }, decoy: { x: 195, y: 450, target: { x: 195, y: 100 } }, enemies: [{ x: 100, y: 500 }, { x: 280, y: 500 }] },
-            7: { player: { x: 100, y: 650 }, passer: { x: 195, y: 750 }, decoy: { x: 300, y: 600, target: { x: 320, y: 250 } }, enemies: [{ x: 100, y: 450 }, { x: 180, y: 350 }] },
-            8: { player: { x: 280, y: 650 }, passer: { x: 195, y: 750 }, decoy: { x: 80, y: 600, target: { x: 50, y: 250 } }, enemies: [{ x: 280, y: 450 }, { x: 200, y: 350 }] },
-            9: { player: { x: 195, y: 650 }, passer: { x: 195, y: 750 }, decoy: { x: 320, y: 600, target: { x: 320, y: 250 } }, enemies: [{ x: 195, y: 450 }, { x: 195, y: 300 }] },
-            10: { player: { x: 195, y: 550 }, passer: { x: 80, y: 700 }, decoy: { x: 300, y: 700, target: { x: 320, y: 100 } }, enemies: [{ x: 130, y: 380 }, { x: 260, y: 380 }] }
+            1: { player: { x: 195, y: 650 }, passer: { x: 195, y: 750 }, decoy: { x: 80, y: 650 }, enemies: [{ x: 100, y: 400 }] },
+            2: { player: { x: 195, y: 650 }, passer: { x: 195, y: 750 }, decoy: { x: 300, y: 650 }, enemies: [{ x: 280, y: 400 }] },
+            3: { player: { x: 195, y: 650 }, passer: { x: 195, y: 750 }, decoy: { x: 80, y: 650 }, enemies: [{ x: 100, y: 450 }, { x: 280, y: 300 }] },
+            4: { player: { x: 100, y: 650 }, passer: { x: 195, y: 750 }, decoy: { x: 300, y: 600 }, enemies: [{ x: 120, y: 400 }] },
+            5: { player: { x: 280, y: 650 }, passer: { x: 195, y: 750 }, decoy: { x: 80, y: 600 }, enemies: [{ x: 260, y: 400 }] },
+            6: { player: { x: 195, y: 650 }, passer: { x: 195, y: 750 }, decoy: { x: 195, y: 450 }, enemies: [{ x: 100, y: 500 }, { x: 280, y: 500 }] },
+            7: { player: { x: 100, y: 650 }, passer: { x: 195, y: 750 }, decoy: { x: 300, y: 600 }, enemies: [{ x: 100, y: 450 }, { x: 180, y: 350 }] },
+            8: { player: { x: 280, y: 650 }, passer: { x: 195, y: 750 }, decoy: { x: 80, y: 600 }, enemies: [{ x: 280, y: 450 }, { x: 200, y: 350 }] },
+            9: { player: { x: 195, y: 650 }, passer: { x: 195, y: 750 }, decoy: { x: 320, y: 600 }, enemies: [{ x: 195, y: 450 }, { x: 195, y: 300 }] },
+            10: { player: { x: 195, y: 550 }, passer: { x: 80, y: 700 }, decoy: { x: 300, y: 700 }, enemies: [{ x: 130, y: 380 }, { x: 260, y: 380 }] }
         };
 
         class TitleScene extends Phaser.Scene {
@@ -79,7 +67,6 @@
                 if (!this.registry.has('stamps')) this.registry.set('stamps', 0);
 
                 const highestStage = StorageManager.getHighestStage();
-
                 this.add.rectangle(195, 230, 320, 60, 0xf1c40f).setInteractive({ useHandCursor: true })
                     .on('pointerdown', () => this.scene.start('ReceiveScene', { stage: highestStage, mode: 'normal' }));
                 this.add.text(195, 230, `▶️ つづきから (ST ${highestStage})`, { fontSize: '22px', color: '#333', fontStyle: 'bold' }).setOrigin(0.5);
@@ -96,16 +83,12 @@
                 this.add.text(195, 420, '⭐ お気に入り の ステージ', { fontSize: '20px', color: '#ffffff', fontStyle: 'bold' }).setOrigin(0.5);
                 
                 if (saved.length === 0) {
-                    this.add.text(195, 470, 'まだ ないよ！', { fontSize: '16px', color: '#ecf0f1' }).setOrigin(0.5);
-                    return;
+                    this.add.text(195, 470, 'まだ ないよ！', { fontSize: '16px', color: '#ecf0f1' }).setOrigin(0.5); return;
                 }
 
                 saved.forEach((stageNum, index) => {
-                    const col = index % 4;
-                    const row = Math.floor(index / 4);
-                    const x = 60 + col * 90;
-                    const y = 480 + row * 70;
-                    
+                    const col = index % 4; const row = Math.floor(index / 4);
+                    const x = 60 + col * 90; const y = 480 + row * 70;
                     this.add.rectangle(x, y, 75, 50, 0x3498db).setInteractive({ useHandCursor: true })
                         .on('pointerdown', () => this.scene.start('ReceiveScene', { stage: stageNum, mode: 'saved' }));
                     this.add.text(x, y, `ST ${stageNum}`, { fontSize: '16px', color: '#fff', fontStyle: 'bold' }).setOrigin(0.5);
@@ -131,7 +114,8 @@
 
                 this.INTERCEPT_RADIUS = 40; 
                 this.CAUTION_RADIUS = 65;
-                this.ENEMY_SPEED = 66;
+                // 【変更】敵のスピードを66から1.2倍の79へ強化
+                this.ENEMY_SPEED = 79;
 
                 this.cameras.main.setBackgroundColor('#27ae60');
                 
@@ -145,13 +129,10 @@
                 this.passer = this.createCharacter(this.config.passer.x, this.config.passer.y, 0xf1c40f, '⚽ パサー'); 
                 this.decoy  = this.createCharacter(this.config.decoy.x, this.config.decoy.y, 0x00ffff, '👤 味方'); 
 
-                this.enemies = [];
-                this.enemyZones = [];
-                this.cautionZones = [];
+                this.enemies = []; this.enemyZones = []; this.cautionZones = [];
                 this.config.enemies.forEach(eConf => {
                     const e = this.createCharacter(eConf.x, eConf.y, 0xe74c3c, '👿 敵');
                     this.enemies.push(e);
-                    
                     const cZone = this.add.circle(0, 0, this.CAUTION_RADIUS, 0xffff00, 0.15).setVisible(false);
                     this.cautionZones.push(cZone);
                     const eZone = this.add.circle(0, 0, this.INTERCEPT_RADIUS, 0xff0000, 0.2).setVisible(false);
@@ -160,27 +141,21 @@
 
                 const confGfx = this.make.graphics({x:0, y:0, add:false});
                 confGfx.fillStyle(0xffffff, 1).fillRect(0, 0, 12, 12);
-                confGfx.generateTexture('confettiTex', 12, 12);
-                confGfx.destroy();
+                confGfx.generateTexture('confettiTex', 12, 12); confGfx.destroy();
 
                 this.fog = this.add.renderTexture(0, 0, 390, 844).setOrigin(0, 0).setDepth(5000);
                 this.fog.fill(0x000000, 0.95);
                 
                 const brushGraphic = this.make.graphics({ x: 0, y: 0, add: false });
                 brushGraphic.fillStyle(0xffffff, 1).fillCircle(60, 60, 60);
-                brushGraphic.generateTexture('brushTex', 120, 120);
-                brushGraphic.destroy(); 
+                brushGraphic.generateTexture('brushTex', 120, 120); brushGraphic.destroy(); 
                 this.brush = this.make.image({ x: 0, y: 0, key: 'brushTex', add: false });
 
                 this.graphics = this.add.graphics();
-                this.uiElements = [];
-                this.dynamicBubbles = []; 
-                this.pathPoints = [];
-                this.isDrawing = false;
-                this.planMode = ''; 
+                this.uiElements = []; this.dynamicBubbles = []; 
+                this.pathPoints = []; this.isDrawing = false; this.planMode = ''; 
 
-                this.setupInput();
-                this.drawTopUI();
+                this.setupInput(); this.drawTopUI();
                 if (this.playMode === 'normal') this.drawStampBook();
                 
                 this.startScanningPhase();
@@ -194,7 +169,6 @@
                         const nowSaved = StorageManager.toggleSave(this.currentStageNum);
                         this.saveBtn.setText(nowSaved ? '⭐ 保存済' : '☆ 保存').setColor(nowSaved ? '#f1c40f' : '#ffffff');
                     });
-
                 this.add.text(40, 20, '🏠', { fontSize: '24px', backgroundColor: '#333', padding: 4 })
                     .setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(9999)
                     .on('pointerdown', () => this.scene.start('TitleScene'));
@@ -285,11 +259,16 @@
                 const activeAIStates = [this.STATE.PLANNING, this.STATE.RUNNING, this.STATE.DECIDING, this.STATE.RE_PLANNING, this.STATE.EXECUTING];
                 if (!activeAIStates.includes(this.currentState) || this.isGameOver) return;
 
-                let speedFactor = (this.currentState === this.STATE.PLANNING || this.currentState === this.STATE.RE_PLANNING || this.currentState === this.STATE.DECIDING) ? 0 : 1.0;
+                let speedFactor = 1.0;
+                // 【変更】思考中・選択中の時間を20%（0.2）へ変更。敵がじわじわ迫る。
+                if ([this.STATE.PLANNING, this.STATE.RE_PLANNING, this.STATE.DECIDING].includes(this.currentState)) {
+                    speedFactor = 0.2; 
+                }
                 
                 let tX = this.ballHolder === 'decoy' ? this.decoy.x : this.player.x;
                 let tY = this.ballHolder === 'decoy' ? this.decoy.y : this.player.y;
 
+                // 敵の移動処理
                 this.enemies.forEach((enemy, index) => {
                     let moveDist = this.ENEMY_SPEED * speedFactor * (delta / 1000);
                     const angle = Phaser.Math.Angle.Between(enemy.x, enemy.y, tX, tY);
@@ -311,12 +290,12 @@
                         }
                     });
 
+                    // 衝突判定
                     if (this.currentState !== this.STATE.RE_PLANNING && this.currentState !== this.STATE.PLANNING && this.currentState !== this.STATE.DECIDING) {
                         let isCollision = false;
-                        if (this.ball && !this.isGameOver) {
+                        if (this.ball && this.ballHolder === 'none' && !this.isGameOver) {
                             if (Phaser.Math.Distance.Between(this.ball.x, this.ball.y, enemy.x, enemy.y) < this.INTERCEPT_RADIUS) {
-                                this.failSimulation('pass', enemy);
-                                isCollision = true;
+                                this.failSimulation('pass', enemy); isCollision = true;
                             }
                         }
                         if (!isCollision && !this.isGameOver) {
@@ -327,6 +306,56 @@
                             }
                         }
                     }
+                });
+
+                // 【新規】味方（オフ・ザ・ボール）のスペースへの自律移動AI
+                this.updateOffTheBallMovement(delta, speedFactor);
+            }
+
+            // 【新規】パサーと囮が、敵から離れつつフリーなスペースを探す処理
+            updateOffTheBallMovement(delta, speedFactor) {
+                const teammates = [this.passer, this.decoy];
+                teammates.forEach(tm => {
+                    const isHoldingBall = (this.ballHolder === 'player' && tm === this.player) || 
+                                          (this.ballHolder === 'decoy' && tm === this.decoy) ||
+                                          (this.ballHolder === 'passer' && tm === this.passer);
+                    if (isHoldingBall) return; // ボール保持中は自律移動しない
+
+                    let vx = 0, vy = -0.5; // 基本的に前線（ゴール方向）へ向かおうとする意識
+                    
+                    // 1. 敵から逃げる（斥力）
+                    this.enemies.forEach(e => {
+                        const dist = Phaser.Math.Distance.Between(tm.x, tm.y, e.x, e.y);
+                        if (dist < 130) {
+                            const angle = Phaser.Math.Angle.Between(e.x, e.y, tm.x, tm.y);
+                            vx += Math.cos(angle) * (130 - dist) * 0.15;
+                            vy += Math.sin(angle) * (130 - dist) * 0.15;
+                        }
+                    });
+
+                    // 2. プレイヤーとの距離を保つ（近すぎず、遠すぎず）
+                    const distP = Phaser.Math.Distance.Between(tm.x, tm.y, this.player.x, this.player.y);
+                    if (distP < 100) {
+                        const angleP = Phaser.Math.Angle.Between(this.player.x, this.player.y, tm.x, tm.y);
+                        vx += Math.cos(angleP) * (100 - distP) * 0.1;
+                        vy += Math.sin(angleP) * (100 - distP) * 0.1;
+                    } else if (distP > 220) {
+                        const angleP = Phaser.Math.Angle.Between(tm.x, tm.y, this.player.x, this.player.y);
+                        vx += Math.cos(angleP) * 0.5;
+                        vy += Math.sin(angleP) * 0.5;
+                    }
+
+                    const len = Math.sqrt(vx*vx + vy*vy);
+                    if (len > 0) {
+                        const moveSpeed = 45 * speedFactor * (delta / 1000);
+                        tm.x += (vx / len) * moveSpeed;
+                        tm.y += (vy / len) * moveSpeed;
+                        tm.bodyGraphics.setRotation(Math.atan2(vy, vx)); // 進行方向を向く
+                    }
+
+                    // フィールド外に出ないように制限
+                    tm.x = Phaser.Math.Clamp(tm.x, 30, 360);
+                    tm.y = Phaser.Math.Clamp(tm.y, 80, 720);
                 });
             }
 
@@ -344,30 +373,42 @@
                 }
             }
 
+            // 【変更】予測パスの完全同期（プレイヤーの走りとパスの動きを同時にスタート）
             startSim() {
                 this.currentState = this.STATE.RUNNING; this.clearUI();
-                this.tweens.add({ targets: this.decoy, x: this.config.decoy.target.x, y: this.config.decoy.target.y, duration: 2000 });
+                this.ballHolder = 'none'; // ボールは移動中
+
                 const curve = new Phaser.Curves.Spline(this.pathPoints);
+                const destPoint = this.pathPoints[this.pathPoints.length - 1];
+                
+                this.ball = this.add.circle(this.passer.x, this.passer.y, 8, 0xffffff).setDepth(6000);
+                
+                // プレイヤーの走り込み
                 this.tweens.addCounter({
                     from: 0, to: 1, duration: 1500,
                     onUpdate: (tw) => {
                         const p = curve.getPoint(tw.getValue());
                         this.player.setPosition(p.x, p.y);
                         if (tw.getValue() < 0.99) this.player.bodyGraphics.setRotation(Phaser.Math.Angle.Between(p.x, p.y, curve.getPoint(tw.getValue() + 0.01).x, curve.getPoint(tw.getValue() + 0.01).y));
-                    },
-                    onComplete: () => this.callPass()
+                    }
                 });
-            }
 
-            callPass() {
-                if (this.isGameOver) return;
-                this.ball = this.add.circle(this.passer.x, this.passer.y, 8, 0xffffff).setDepth(6000);
-                let tx = this.player.x, ty = this.player.y;
-                if (this.passType === 'space') { ty -= 120; this.tweens.add({ targets: this.player, y: ty, duration: 800 }); }
-                this.tweens.add({ targets: this.ball, x: tx, y: ty, duration: 800, onComplete: () => {
-                    this.ballHolder = 'player';
-                    this.askChange();
-                }});
+                // 同時に、到達点へのパスを放つ
+                this.tweens.add({
+                    targets: this.ball, x: destPoint.x, y: destPoint.y, duration: 1500, ease: 'Sine.easeOut',
+                    onComplete: () => {
+                        this.ballHolder = 'player'; // 到達点で受け取る
+                        if (this.passType === 'space') {
+                            // スペースへのパスなら、受け取った勢いで少し前進
+                            this.tweens.add({
+                                targets: [this.player, this.ball], y: destPoint.y - 80, duration: 500,
+                                onComplete: () => this.askChange()
+                            });
+                        } else {
+                            this.askChange();
+                        }
+                    }
+                });
             }
 
             askChange() {
@@ -419,16 +460,18 @@
 
             execPassToDecoy() {
                 if (this.isGameOver) return;
-                this.graphics.clear();
-                const targetPoint = this.pathPoints[this.pathPoints.length - 1];
+                this.currentState = this.STATE.RUNNING;
+                this.graphics.clear(); this.clearUI();
+                this.ballHolder = 'none';
+                const destPoint = this.pathPoints[this.pathPoints.length - 1];
+                
                 this.showSpeechBubble(this.decoy, 'ヘイ！パス！');
                 
-                // 以前のdecoyの移動tweenが残っている場合を考慮しクリアする
+                // 囮はスペースに向けて自律的に動いているが、パスが出たら到達点へ走らせる
                 this.tweens.killTweensOf(this.decoy);
-
-                this.tweens.add({ targets: this.decoy, x: targetPoint.x, y: targetPoint.y, duration: 600 });
+                this.tweens.add({ targets: this.decoy, x: destPoint.x, y: destPoint.y, duration: 800 });
                 this.tweens.add({
-                    targets: this.ball, x: targetPoint.x, y: targetPoint.y, duration: 600,
+                    targets: this.ball, x: destPoint.x, y: destPoint.y, duration: 800,
                     onComplete: () => {
                         if (this.isGameOver) return;
                         if (Phaser.Math.Distance.Between(this.ball.x, this.ball.y, this.decoy.x, this.decoy.y) < 60) {
@@ -447,20 +490,15 @@
                 });
             }
 
-            // 【完全修正】ワンツーパスの物理的・論理的な矛盾を解消（パスと走りを同期）
             execReturnPass() {
                 this.currentState = this.STATE.RUNNING; this.clearUI(); this.graphics.clear();
+                this.ballHolder = 'none';
                 const curve = new Phaser.Curves.Spline(this.pathPoints);
-                const destPoint = this.pathPoints[this.pathPoints.length - 1]; // プレイヤーの目的地
+                const destPoint = this.pathPoints[this.pathPoints.length - 1];
 
                 this.showSpeechBubble(this.decoy, 'はいよ！', true);
 
-                // ターゲットをプレイヤーに戻すことで、敵が走り込むプレイヤーをマークし始める（リアルなディフェンス挙動）
-                this.ballHolder = 'player'; 
-
-                // プレイヤーの走りと「同時」にボールが目的地へ向かって放たれる
                 this.tweens.add({ targets: this.ball, x: destPoint.x, y: destPoint.y, duration: 1200, ease: 'Sine.easeOut' });
-
                 this.tweens.addCounter({
                     from: 0, to: 1, duration: 1200,
                     onUpdate: (tw) => {
@@ -471,6 +509,7 @@
                     },
                     onComplete: () => {
                         if (this.isGameOver) return;
+                        this.ballHolder = 'player';
                         if (Phaser.Geom.Polygon.Contains(this.shootZone, this.player.x, this.player.y)) {
                             this.currentState = this.STATE.EXECUTING;
                             this.showSpeechBubble(this.player, 'もらった！', true);
