@@ -6,7 +6,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <title>サッカーパズル - Dynamic AI Edition</title>
+    <title>サッカーパズル - Perfect Triangle Edition</title>
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
     <style>
         @media screen and (orientation: landscape) {
@@ -81,11 +81,9 @@
             drawSavedStages() {
                 const saved = StorageManager.getSaved();
                 this.add.text(195, 420, '⭐ お気に入り の ステージ', { fontSize: '20px', color: '#ffffff', fontStyle: 'bold' }).setOrigin(0.5);
-                
                 if (saved.length === 0) {
                     this.add.text(195, 470, 'まだ ないよ！', { fontSize: '16px', color: '#ecf0f1' }).setOrigin(0.5); return;
                 }
-
                 saved.forEach((stageNum, index) => {
                     const col = index % 4; const row = Math.floor(index / 4);
                     const x = 60 + col * 90; const y = 480 + row * 70;
@@ -114,8 +112,7 @@
 
                 this.INTERCEPT_RADIUS = 40; 
                 this.CAUTION_RADIUS = 65;
-                // 【変更】敵のスピードを66から1.2倍の79へ強化
-                this.ENEMY_SPEED = 79;
+                this.ENEMY_SPEED = 79; // 1.2倍速の敵
 
                 this.cameras.main.setBackgroundColor('#27ae60');
                 
@@ -260,15 +257,14 @@
                 if (!activeAIStates.includes(this.currentState) || this.isGameOver) return;
 
                 let speedFactor = 1.0;
-                // 【変更】思考中・選択中の時間を20%（0.2）へ変更。敵がじわじわ迫る。
                 if ([this.STATE.PLANNING, this.STATE.RE_PLANNING, this.STATE.DECIDING].includes(this.currentState)) {
                     speedFactor = 0.2; 
                 }
                 
-                let tX = this.ballHolder === 'decoy' ? this.decoy.x : this.player.x;
-                let tY = this.ballHolder === 'decoy' ? this.decoy.y : this.player.y;
+                let tX = this.player.x, tY = this.player.y;
+                if (this.ballHolder === 'decoy') { tX = this.decoy.x; tY = this.decoy.y; }
+                else if (this.ballHolder === 'passer') { tX = this.passer.x; tY = this.passer.y; }
 
-                // 敵の移動処理
                 this.enemies.forEach((enemy, index) => {
                     let moveDist = this.ENEMY_SPEED * speedFactor * (delta / 1000);
                     const angle = Phaser.Math.Angle.Between(enemy.x, enemy.y, tX, tY);
@@ -290,7 +286,6 @@
                         }
                     });
 
-                    // 衝突判定
                     if (this.currentState !== this.STATE.RE_PLANNING && this.currentState !== this.STATE.PLANNING && this.currentState !== this.STATE.DECIDING) {
                         let isCollision = false;
                         if (this.ball && this.ballHolder === 'none' && !this.isGameOver) {
@@ -303,27 +298,26 @@
                                 this.failSimulation('player', enemy);
                             } else if (this.ballHolder === 'decoy' && Phaser.Math.Distance.Between(this.decoy.x, this.decoy.y, enemy.x, enemy.y) < this.INTERCEPT_RADIUS) {
                                 this.failSimulation('decoy', enemy);
+                            } else if (this.ballHolder === 'passer' && Phaser.Math.Distance.Between(this.passer.x, this.passer.y, enemy.x, enemy.y) < this.INTERCEPT_RADIUS) {
+                                this.failSimulation('passer', enemy);
                             }
                         }
                     }
                 });
 
-                // 【新規】味方（オフ・ザ・ボール）のスペースへの自律移動AI
                 this.updateOffTheBallMovement(delta, speedFactor);
             }
 
-            // 【新規】パサーと囮が、敵から離れつつフリーなスペースを探す処理
             updateOffTheBallMovement(delta, speedFactor) {
                 const teammates = [this.passer, this.decoy];
                 teammates.forEach(tm => {
                     const isHoldingBall = (this.ballHolder === 'player' && tm === this.player) || 
                                           (this.ballHolder === 'decoy' && tm === this.decoy) ||
                                           (this.ballHolder === 'passer' && tm === this.passer);
-                    if (isHoldingBall) return; // ボール保持中は自律移動しない
+                    if (isHoldingBall) return;
 
-                    let vx = 0, vy = -0.5; // 基本的に前線（ゴール方向）へ向かおうとする意識
+                    let vx = 0, vy = -0.5;
                     
-                    // 1. 敵から逃げる（斥力）
                     this.enemies.forEach(e => {
                         const dist = Phaser.Math.Distance.Between(tm.x, tm.y, e.x, e.y);
                         if (dist < 130) {
@@ -333,7 +327,6 @@
                         }
                     });
 
-                    // 2. プレイヤーとの距離を保つ（近すぎず、遠すぎず）
                     const distP = Phaser.Math.Distance.Between(tm.x, tm.y, this.player.x, this.player.y);
                     if (distP < 100) {
                         const angleP = Phaser.Math.Angle.Between(this.player.x, this.player.y, tm.x, tm.y);
@@ -350,10 +343,9 @@
                         const moveSpeed = 45 * speedFactor * (delta / 1000);
                         tm.x += (vx / len) * moveSpeed;
                         tm.y += (vy / len) * moveSpeed;
-                        tm.bodyGraphics.setRotation(Math.atan2(vy, vx)); // 進行方向を向く
+                        tm.bodyGraphics.setRotation(Math.atan2(vy, vx));
                     }
 
-                    // フィールド外に出ないように制限
                     tm.x = Phaser.Math.Clamp(tm.x, 30, 360);
                     tm.y = Phaser.Math.Clamp(tm.y, 80, 720);
                 });
@@ -368,22 +360,19 @@
                     this.currentState = this.STATE.EXECUTING;
                     this.clearUI();
                     if (this.planMode === 'dribble') this.execDribble(); 
-                    else if (this.planMode === 'pass') this.execPassToDecoy();
+                    else if (this.planMode === 'pass') this.execPassToTeammate(); // 名称変更
                     else if (this.planMode === 'return') this.execReturnPass();
                 }
             }
 
-            // 【変更】予測パスの完全同期（プレイヤーの走りとパスの動きを同時にスタート）
             startSim() {
                 this.currentState = this.STATE.RUNNING; this.clearUI();
-                this.ballHolder = 'none'; // ボールは移動中
+                this.ballHolder = 'none';
 
                 const curve = new Phaser.Curves.Spline(this.pathPoints);
                 const destPoint = this.pathPoints[this.pathPoints.length - 1];
-                
                 this.ball = this.add.circle(this.passer.x, this.passer.y, 8, 0xffffff).setDepth(6000);
                 
-                // プレイヤーの走り込み
                 this.tweens.addCounter({
                     from: 0, to: 1, duration: 1500,
                     onUpdate: (tw) => {
@@ -393,13 +382,11 @@
                     }
                 });
 
-                // 同時に、到達点へのパスを放つ
                 this.tweens.add({
                     targets: this.ball, x: destPoint.x, y: destPoint.y, duration: 1500, ease: 'Sine.easeOut',
                     onComplete: () => {
-                        this.ballHolder = 'player'; // 到達点で受け取る
+                        this.ballHolder = 'player';
                         if (this.passType === 'space') {
-                            // スペースへのパスなら、受け取った勢いで少し前進
                             this.tweens.add({
                                 targets: [this.player, this.ball], y: destPoint.y - 80, duration: 500,
                                 onComplete: () => this.askChange()
@@ -438,11 +425,22 @@
                 }
             }
 
+            // 【完全修正】ドリブルの移動速度を敵と完全に同じ速度（距離に基づく動的計算）に変更
             execDribble() {
                 let hasShot = false; this.graphics.clear();
                 const curve = new Phaser.Curves.Spline(this.pathPoints);
+                
+                // ピクセル単位の総移動距離を計算
+                let pathLength = 0;
+                for(let i=0; i<this.pathPoints.length-1; i++){
+                    pathLength += Phaser.Math.Distance.Between(this.pathPoints[i].x, this.pathPoints[i].y, this.pathPoints[i+1].x, this.pathPoints[i+1].y);
+                }
+                
+                // 距離 ÷ 敵スピード = かかる時間（ミリ秒）
+                const duration = pathLength === 0 ? 100 : (pathLength / this.ENEMY_SPEED) * 1000;
+
                 this.dribbleTween = this.tweens.addCounter({
-                    from: 0, to: 1, duration: 1000,
+                    from: 0, to: 1, duration: duration, // 動的に計算した時間を設定
                     onUpdate: (tw) => { 
                         if (this.isGameOver || hasShot) return;
                         const p = curve.getPoint(tw.getValue()); 
@@ -458,28 +456,38 @@
                 });
             }
 
-            execPassToDecoy() {
+            // 【新機能】パサーも対象に含めたパス処理
+            execPassToTeammate() {
                 if (this.isGameOver) return;
                 this.currentState = this.STATE.RUNNING;
                 this.graphics.clear(); this.clearUI();
                 this.ballHolder = 'none';
+                
                 const destPoint = this.pathPoints[this.pathPoints.length - 1];
                 
-                this.showSpeechBubble(this.decoy, 'ヘイ！パス！');
+                // 描いた線の終点から、パサーと囮のどちらが近いかAIが自動判定
+                const distToPasser = Phaser.Math.Distance.Between(destPoint.x, destPoint.y, this.passer.x, this.passer.y);
+                const distToDecoy = Phaser.Math.Distance.Between(destPoint.x, destPoint.y, this.decoy.x, this.decoy.y);
                 
-                // 囮はスペースに向けて自律的に動いているが、パスが出たら到達点へ走らせる
-                this.tweens.killTweensOf(this.decoy);
-                this.tweens.add({ targets: this.decoy, x: destPoint.x, y: destPoint.y, duration: 800 });
+                const receiver = (distToPasser < distToDecoy) ? this.passer : this.decoy;
+                const receiverId = (distToPasser < distToDecoy) ? 'passer' : 'decoy';
+                
+                this.showSpeechBubble(receiver, 'ヘイ！パス！');
+                
+                this.tweens.killTweensOf(receiver);
+                this.tweens.add({ targets: receiver, x: destPoint.x, y: destPoint.y, duration: 800 });
+                
                 this.tweens.add({
                     targets: this.ball, x: destPoint.x, y: destPoint.y, duration: 800,
                     onComplete: () => {
                         if (this.isGameOver) return;
-                        if (Phaser.Math.Distance.Between(this.ball.x, this.ball.y, this.decoy.x, this.decoy.y) < 60) {
-                            if (Phaser.Geom.Polygon.Contains(this.shootZone, this.decoy.x, this.decoy.y)) {
+                        if (Phaser.Math.Distance.Between(this.ball.x, this.ball.y, receiver.x, receiver.y) < 60) {
+                            if (Phaser.Geom.Polygon.Contains(this.shootZone, receiver.x, receiver.y)) {
                                 this.clearUI();
                                 this.tweens.add({ targets: this.ball, x: 195, y: 40, duration: 300, onComplete: () => this.win('✨ 完璧な連携！') });
                             } else {
-                                this.ballHolder = 'decoy'; this.currentState = this.STATE.RE_PLANNING; this.planMode = 'return';
+                                this.ballHolder = receiverId; // 選ばれた味方がボール保持者になる
+                                this.currentState = this.STATE.RE_PLANNING; this.planMode = 'return';
                                 this.graphics.clear(); this.clearUI();
                                 this.showSpeechBubble(this.player, 'リターン！');
                                 const t = this.add.text(195, 300, 'パスをもらうみちを かいて！', { fontSize: '24px', backgroundColor: '#000', padding: 5 }).setOrigin(0.5).setDepth(6000);
@@ -492,11 +500,15 @@
 
             execReturnPass() {
                 this.currentState = this.STATE.RUNNING; this.clearUI(); this.graphics.clear();
+                
+                // 現在ボールを持っている味方を特定
+                const sender = this.ballHolder === 'passer' ? this.passer : this.decoy;
                 this.ballHolder = 'none';
+
                 const curve = new Phaser.Curves.Spline(this.pathPoints);
                 const destPoint = this.pathPoints[this.pathPoints.length - 1];
 
-                this.showSpeechBubble(this.decoy, 'はいよ！', true);
+                this.showSpeechBubble(sender, 'はいよ！', true);
 
                 this.tweens.add({ targets: this.ball, x: destPoint.x, y: destPoint.y, duration: 1200, ease: 'Sine.easeOut' });
                 this.tweens.addCounter({
@@ -527,6 +539,7 @@
 
                 let target = this.player;
                 if (reason === 'decoy') target = this.decoy;
+                else if (reason === 'passer') target = this.passer; // パサーが捕まった場合
                 
                 if (caughtByEnemy) this.showSpeechBubble(caughtByEnemy, '💨 つかまえた！', true);
                 if(target.list[1]) target.list[1].setText('😵 ぐるぐる…');
