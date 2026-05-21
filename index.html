@@ -6,7 +6,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <title>サッカーパズル - 2on2 Tactical Defense</title>
+    <title>サッカーパズル - 2on2 Tactical Defense (Random Update)</title>
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
     <style>
         @media screen and (orientation: landscape) {
@@ -24,14 +24,12 @@
 </head>
 <body>
     <script>
-        // タイトルとシミュレーションの切り替えのみのシンプルな構成に再編
         class TitleScene extends Phaser.Scene {
             constructor() { super('TitleScene'); }
             create() {
                 this.cameras.main.setBackgroundColor('#2ecc71');
                 this.add.text(195, 150, 'サッカー パズル！', { fontSize: '38px', color: '#ffffff', fontStyle: 'bold' }).setOrigin(0.5);
                 
-                // モード選択
                 this.add.rectangle(195, 300, 320, 60, 0xf1c40f).setInteractive({ useHandCursor: true })
                     .on('pointerdown', () => this.scene.start('ReceiveScene', { stage: 1, mode: 'normal' }));
                 this.add.text(195, 300, '🏃 オフェンス編 (こうげき)', { fontSize: '20px', color: '#333', fontStyle: 'bold' }).setOrigin(0.5);
@@ -42,21 +40,20 @@
             }
         }
 
-        // --- 旧オフェンスモード (データ軽量保持化) ---
         class ReceiveScene extends Phaser.Scene {
             constructor() { super('ReceiveScene'); }
-            create() { this.scene.start('TitleScene'); } // ※ディフェンス編に注力するため一旦タイトルへ戻す形に保護
+            create() { this.scene.start('TitleScene'); } 
         }
 
-        // --- 【完全新規】2対2 タクティカル・ディフェンスモード ---
         class DefenseScene extends Phaser.Scene {
             constructor() { super('DefenseScene'); }
 
             create() {
                 this.cameras.main.setBackgroundColor('#27ae60');
                 this.isPhaseFinished = false;
+                this.hasJudged = false;
 
-                // ゴールエリア（ここを突破されたら失点）
+                // ゴールエリア
                 this.add.rectangle(195, 20, 200, 40, 0xffffff, 0.9).setStrokeStyle(4, 0xe74c3c);
                 this.add.text(195, 20, 'G O A L', { fontSize: '28px', color: '#e74c3c', fontStyle: 'bold' }).setOrigin(0.5);
 
@@ -65,34 +62,43 @@
                     .setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(9999)
                     .on('pointerdown', () => this.scene.start('TitleScene'));
 
-                // 1. オフェンスチーム（黄色）
-                this.passer = this.createVisualChar(195, 680, 0xf1c40f, '⚽ 相手1 (パサー)');
-                this.receiver = this.createVisualChar(100, 350, 0xf1c40f, '🏃 相手2 (レシーバー)');
-                this.ball = this.add.circle(this.passer.x, this.passer.y, 8, 0xffffff).setDepth(5000);
-
-                // 2. ディフェンスチーム（AI相方=青、プレイヤー=赤）
-                this.dfPartner = this.createVisualChar(195, 580, 0x3498db, '👤 味方DF'); // パサーへ寄せる役
-                this.playerDF = this.createVisualChar(195, 480, 0xe74c3c, '🛡️ あなた'); // 初期位置（半透明で配置待ち）
-                this.playerDF.setAlpha(0.6);
-
-                // 予測ターゲットスペース（パスの出し先ターゲット）
-                this.passTargetX = 280;
+                // 【拡張ポイント】相手2（レシーバー）の走り込む先を「左右ランダム」に決定
+                // 50%の確率で右（280）、50%の確率で左（110）になる
+                const isRightTarget = Math.random() < 0.5;
+                this.passTargetX = isRightTarget ? 280 : 110;
                 this.passTargetY = 320;
 
+                // 初期レシーバーの位置（ターゲットと逆側に配置して、鋭く斜めに走り込ませる）
+                const initialReceiverX = isRightTarget ? 100 : 290;
+
+                // オフェンスチーム（黄色）
+                this.passer = this.createVisualChar(195, 680, 0xf1c40f, '⚽ 相手1 (パサー)');
+                this.receiver = this.createVisualChar(initialReceiverX, 350, 0xf1c40f, '🏃 相手2 (レシーバー)');
+                this.ball = this.add.circle(this.passer.x, this.passer.y, 8, 0xffffff).setDepth(5000);
+
+                // ディフェンスチーム
+                this.dfPartner = this.createVisualChar(195, 580, 0x3498db, '👤 味方DF'); 
+                this.playerDF = this.createVisualChar(195, 480, 0xe74c3c, '🛡️ あなた'); 
+                this.playerDF.setAlpha(0.6);
+
+                // 攻撃の予測軌道線（動的に左右へ切り替わる）
+                this.pathGraphics = this.add.graphics();
+                this.pathGraphics.lineStyle(4, 0xffffff, 0.25);
+                this.pathGraphics.strokeLineShape(new Phaser.Geom.Line(this.passer.x, this.passer.y, this.passTargetX, this.passTargetY));
+
                 // ガイドUI
-                this.guideText = this.add.text(195, 150, '相手2にパスがでるぞ！\nまもる場所を タップして 選ぼう！', {
-                    fontSize: '18px', color: '#fff', backgroundColor: '#000', padding: 8, align: 'center', fontStyle: 'bold'
+                this.guideText = this.add.text(195, 150, '白い線のスペースに パスがでるぞ！\nコースを切る場所を タップで 選ぼう！', {
+                    fontSize: '17px', color: '#fff', backgroundColor: '#000', padding: 8, align: 'center', fontStyle: 'bold'
                 }).setOrigin(0.5);
 
                 // タップでポジション選択
                 this.input.on('pointerdown', (pointer) => {
                     if (this.isPhaseFinished || pointer.y < 100 || pointer.y > 600) return;
                     
-                    // プレイヤーDFを配置
                     this.playerDF.setPosition(pointer.x, pointer.y);
                     this.playerDF.setAlpha(1.0);
                     
-                    this.guideText.destroy();
+                    if (this.guideText) this.guideText.destroy();
                     this.startTacticalSimulation();
                 });
             }
@@ -100,28 +106,28 @@
             startTacticalSimulation() {
                 this.isPhaseFinished = true;
 
-                // 1. 味方DF(青)がボール保持者(パサー)へ鋭くプレスをかける
+                // 1. 味方DF(青)のプレス
                 this.tweens.add({
                     targets: this.dfPartner,
                     x: this.passer.x, y: this.passer.y + 40,
                     duration: 1000, ease: 'Quad.easeOut'
                 });
 
-                // 2. 相手2(レシーバー)がスペースへ鋭く走り出す（オフザボールの動き）
+                // 2. 相手2(レシーバー)がランダムに決まったスペースへ走り出す
                 this.tweens.add({
                     targets: this.receiver,
                     x: this.passTargetX, y: this.passTargetY,
                     duration: 1200, ease: 'Sine.easeInOut'
                 });
 
-                // 3. パサーが走り込みを予測して斜めの鋭い「スルーパス」を出す
+                // 3. パス始動
                 this.time.delayedCall(300, () => {
                     this.tweens.add({
                         targets: this.ball,
                         x: this.passTargetX, y: this.passTargetY,
                         duration: 900, ease: 'Linear',
                         onUpdate: () => {
-                            // パス通過中：もしプレイヤーがパスコース（線分）を完全に遮断していたらインターセプト
+                            // 動的なパスカット判定
                             const distToBall = Phaser.Math.Distance.Between(this.playerDF.x, this.playerDF.y, this.ball.x, this.ball.y);
                             if (distToBall < 35 && !this.hasJudged) {
                                 this.hasJudged = true;
@@ -135,28 +141,23 @@
                 });
             }
 
-            // 到達フェーズ：パスが通ってしまった直後の、レシーバーへのアプローチ距離判定（確率の導入）
             evaluateArrivalPhase() {
                 this.hasJudged = true;
                 const distToReceiver = Phaser.Math.Distance.Between(this.playerDF.x, this.playerDF.y, this.receiver.x, this.receiver.y);
 
                 if (distToReceiver < 65) {
-                    // 合格エリア：レシーバーに非常に近い位置にポジションを取れていた場合（確率70%でタックル成功）
-                    const dice = Math.random();
-                    if (dice < 0.7) {
+                    // 確率70%でタックル成功
+                    if (Math.random() < 0.7) {
                         this.triggerResult(true, '⚔️ ナイスアプローチ！\n前を向かせずに ボールをうばった！');
                     } else {
-                        // 30%でかわされる
                         this.execOffenseGoalAnimation('😵 おしい！\nよせきれず かわされてしまった…');
                     }
                 } else {
-                    // 不正解エリア：ポジションが遠すぎて、フリーで前を向かれてシュートされる
                     this.execOffenseGoalAnimation('❌ マークが とおすぎる！\nフリーで シュートを 打たれた…');
                 }
             }
 
             execOffenseGoalAnimation(msg) {
-                // 相手レシーバーがボールをゴールへ蹴り込むアニメーション
                 this.tweens.add({
                     targets: this.ball,
                     x: 195, y: 30,
@@ -169,13 +170,11 @@
                 this.tweens.killAll();
                 const color = isWin ? '#2ecc71' : '#e74c3c';
                 
-                // 結果表示UI
                 this.add.rectangle(195, 450, 340, 120, 0x000000, 0.85).setDepth(9000).setStrokeStyle(3, color);
                 this.add.text(195, 450, message, {
                     fontSize: '20px', color: '#fff', fontStyle: 'bold', align: 'center', lineHeight: 1.5
                 }).setOrigin(0.5).setDepth(9001);
 
-                // 2秒後にリスタート
                 this.time.delayedCall(2500, () => this.scene.restart());
             }
 
