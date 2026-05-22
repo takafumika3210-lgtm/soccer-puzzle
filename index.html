@@ -6,7 +6,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <title>サッカーパズル - 2on2 Tactical Defense (Random Update)</title>
+    <title>サッカーパズル - Attack & Defense Ultimate</title>
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
     <style>
         @media screen and (orientation: landscape) {
@@ -24,27 +24,587 @@
 </head>
 <body>
     <script>
+        // --- データ管理ユーティリティ ---
+        const StorageManager = {
+            getSaved: () => { try { return JSON.parse(localStorage.getItem('soccer_puzzle_saved_stages')) || []; } catch(e) { return []; } },
+            toggleSave: (stageNum) => {
+                try {
+                    let saved = StorageManager.getSaved();
+                    if (saved.includes(stageNum)) saved = saved.filter(s => s !== stageNum);
+                    else saved.push(stageNum);
+                    saved.sort((a, b) => a - b);
+                    localStorage.setItem('soccer_puzzle_saved_stages', JSON.stringify(saved));
+                    return saved.includes(stageNum);
+                } catch(e) { return false; }
+            },
+            getHighestStage: () => { try { return parseInt(localStorage.getItem('soccer_highest_stage')) || 1; } catch(e) { return 1; } },
+            updateHighestStage: (stageNum) => {
+                try {
+                    const current = StorageManager.getHighestStage();
+                    if (stageNum > current && stageNum <= 10) localStorage.setItem('soccer_highest_stage', stageNum);
+                } catch(e) {}
+            }
+        };
+
+        const STAGE_CONFIG = {
+            1: { player: { x: 195, y: 650 }, passer: { x: 195, y: 750 }, decoy: { x: 80, y: 650 }, enemies: [{ x: 100, y: 400 }] },
+            2: { player: { x: 195, y: 650 }, passer: { x: 195, y: 750 }, decoy: { x: 300, y: 650 }, enemies: [{ x: 280, y: 400 }] },
+            3: { player: { x: 195, y: 650 }, passer: { x: 195, y: 750 }, decoy: { x: 80, y: 650 }, enemies: [{ x: 100, y: 450 }, { x: 280, y: 300 }] },
+            4: { player: { x: 100, y: 650 }, passer: { x: 195, y: 750 }, decoy: { x: 300, y: 600 }, enemies: [{ x: 120, y: 400 }] },
+            5: { player: { x: 280, y: 650 }, passer: { x: 195, y: 750 }, decoy: { x: 80, y: 600 }, enemies: [{ x: 260, y: 400 }] },
+            6: { player: { x: 195, y: 650 }, passer: { x: 195, y: 750 }, decoy: { x: 195, y: 450 }, enemies: [{ x: 100, y: 500 }, { x: 280, y: 500 }] },
+            7: { player: { x: 100, y: 650 }, passer: { x: 195, y: 750 }, decoy: { x: 300, y: 600 }, enemies: [{ x: 100, y: 450 }, { x: 180, y: 350 }] },
+            8: { player: { x: 280, y: 650 }, passer: { x: 195, y: 750 }, decoy: { x: 80, y: 600 }, enemies: [{ x: 280, y: 450 }, { x: 200, y: 350 }] },
+            9: { player: { x: 195, y: 650 }, passer: { x: 195, y: 750 }, decoy: { x: 320, y: 600 }, enemies: [{ x: 195, y: 450 }, { x: 195, y: 300 }] },
+            10: { player: { x: 195, y: 550 }, passer: { x: 80, y: 700 }, decoy: { x: 300, y: 700 }, enemies: [{ x: 130, y: 380 }, { x: 260, y: 380 }] }
+        };
+
+        // --- タイトルシーン ---
         class TitleScene extends Phaser.Scene {
             constructor() { super('TitleScene'); }
             create() {
                 this.cameras.main.setBackgroundColor('#2ecc71');
-                this.add.text(195, 150, 'サッカー パズル！', { fontSize: '38px', color: '#ffffff', fontStyle: 'bold' }).setOrigin(0.5);
+                this.add.text(195, 100, 'サッカー パズル！', { fontSize: '38px', color: '#ffffff', fontStyle: 'bold' }).setOrigin(0.5);
                 
-                this.add.rectangle(195, 300, 320, 60, 0xf1c40f).setInteractive({ useHandCursor: true })
-                    .on('pointerdown', () => this.scene.start('ReceiveScene', { stage: 1, mode: 'normal' }));
-                this.add.text(195, 300, '🏃 オフェンス編 (こうげき)', { fontSize: '20px', color: '#333', fontStyle: 'bold' }).setOrigin(0.5);
+                if (!this.registry.has('stamps')) this.registry.set('stamps', 0);
+                const highestStage = StorageManager.getHighestStage();
+                
+                // メインモード選択ボタン
+                this.add.rectangle(195, 200, 320, 55, 0xf1c40f).setInteractive({ useHandCursor: true })
+                    .on('pointerdown', () => this.scene.start('ReceiveScene', { stage: highestStage, mode: 'normal' }));
+                this.add.text(195, 200, `🏃 つづきから (ST ${highestStage})`, { fontSize: '20px', color: '#333', fontStyle: 'bold' }).setOrigin(0.5);
 
-                this.add.rectangle(195, 400, 320, 60, 0xe74c3c).setInteractive({ useHandCursor: true })
+                this.add.rectangle(195, 275, 320, 55, 0xffffff).setInteractive({ useHandCursor: true })
+                    .on('pointerdown', () => this.scene.start('ReceiveScene', { stage: 1, mode: 'normal' }));
+                this.add.text(195, 275, '🔄 はじめから (こうげき)', { fontSize: '20px', color: '#333', fontStyle: 'bold' }).setOrigin(0.5);
+
+                this.add.rectangle(195, 350, 320, 55, 0xe74c3c).setInteractive({ useHandCursor: true })
                     .on('pointerdown', () => this.scene.start('DefenseScene'));
-                this.add.text(195, 400, '🛡️ ディフェンス編 (2対2)', { fontSize: '20px', color: '#fff', fontStyle: 'bold' }).setOrigin(0.5);
+                this.add.text(195, 350, '🛡️ ディフェンス編 (まもり)', { fontSize: '20px', color: '#fff', fontStyle: 'bold' }).setOrigin(0.5);
+
+                this.drawSavedStages();
+            }
+
+            drawSavedStages() {
+                const saved = StorageManager.getSaved();
+                this.add.text(195, 450, '⭐ お気に入り の ステージ', { fontSize: '20px', color: '#ffffff', fontStyle: 'bold' }).setOrigin(0.5);
+                if (saved.length === 0) {
+                    this.add.text(195, 500, 'まだ ないよ！', { fontSize: '16px', color: '#ecf0f1' }).setOrigin(0.5); return;
+                }
+                saved.forEach((stageNum, index) => {
+                    const col = index % 4; const row = Math.floor(index / 4);
+                    const x = 60 + col * 90; const y = 510 + row * 70;
+                    this.add.rectangle(x, y, 75, 50, 0x3498db).setInteractive({ useHandCursor: true })
+                        .on('pointerdown', () => this.scene.start('ReceiveScene', { stage: stageNum, mode: 'saved' }));
+                    this.add.text(x, y, `ST ${stageNum}`, { fontSize: '16px', color: '#fff', fontStyle: 'bold' }).setOrigin(0.5);
+                });
             }
         }
 
+        // --- 【完全復活】オフェンスモードシーン ---
         class ReceiveScene extends Phaser.Scene {
             constructor() { super('ReceiveScene'); }
-            create() { this.scene.start('TitleScene'); } 
+
+            init(data) {
+                this.currentStageNum = data ? (data.stage || 1) : 1;
+                this.playMode = data ? (data.mode || 'normal') : 'normal';
+                this.config = STAGE_CONFIG[this.currentStageNum] || STAGE_CONFIG[1];
+                this.stamps = this.registry.get('stamps') || 0;
+            }
+
+            create() {
+                this.STATE = { SCANNING: 0, PLANNING: 1, RUNNING: 2, DECIDING: 3, RE_PLANNING: 4, EXECUTING: 5, FINISHED: 6 };
+                this.currentState = null; 
+                this.isGameOver = false;
+                this.ballHolder = 'passer';
+
+                this.INTERCEPT_RADIUS = 40; 
+                this.CAUTION_RADIUS = 65;
+                this.ENEMY_SPEED = 79; // 1.2倍速
+
+                this.cameras.main.setBackgroundColor('#27ae60');
+                
+                this.add.rectangle(195, 20, 200, 40, 0xffffff, 0.9).setStrokeStyle(4, 0xe74c3c);
+                this.add.text(195, 20, 'G O A L', { fontSize: '28px', color: '#e74c3c', fontStyle: 'bold' }).setOrigin(0.5);
+                
+                this.shootZone = new Phaser.Geom.Polygon([135, 40, 255, 40, 350, 300, 40, 300]);
+                this.add.graphics().fillStyle(0x3498db, 0.2).fillPoints(this.shootZone.points, true);
+
+                this.player = this.createCharacter(this.config.player.x, this.config.player.y, 0x3498db, '⬇️ 自分', true); 
+                this.passer = this.createCharacter(this.config.passer.x, this.config.passer.y, 0xf1c40f, '⚽ パサー'); 
+                this.decoy  = this.createCharacter(this.config.decoy.x, this.config.decoy.y, 0x00ffff, '👤 味方'); 
+
+                this.enemies = []; this.enemyZones = []; this.cautionZones = [];
+                this.config.enemies.forEach(eConf => {
+                    const e = this.createCharacter(eConf.x, eConf.y, 0xe74c3c, '👿 敵');
+                    this.enemies.push(e);
+                    const cZone = this.add.circle(0, 0, this.CAUTION_RADIUS, 0xffff00, 0.15).setVisible(false);
+                    this.cautionZones.push(cZone);
+                    const eZone = this.add.circle(0, 0, this.INTERCEPT_RADIUS, 0xff0000, 0.2).setVisible(false);
+                    this.enemyZones.push(eZone);
+                });
+
+                const confGfx = this.make.graphics({x:0, y:0, add:false});
+                confGfx.fillStyle(0xffffff, 1).fillRect(0, 0, 12, 12);
+                confGfx.generateTexture('confettiTex', 12, 12); confGfx.destroy();
+
+                this.fog = this.add.renderTexture(0, 0, 390, 844).setOrigin(0, 0).setDepth(5000);
+                this.fog.fill(0x000000, 0.95);
+                
+                const brushGraphic = this.make.graphics({ x: 0, y: 0, add: false });
+                brushGraphic.fillStyle(0xffffff, 1).fillCircle(60, 60, 60);
+                brushGraphic.generateTexture('brushTex', 120, 120); brushGraphic.destroy(); 
+                this.brush = this.make.image({ x: 0, y: 0, key: 'brushTex', add: false });
+
+                this.graphics = this.add.graphics();
+                this.uiElements = []; this.dynamicBubbles = []; 
+                this.pathPoints = []; this.isDrawing = false; this.planMode = ''; 
+
+                this.setupInput(); this.drawTopUI();
+                if (this.playMode === 'normal') this.drawStampBook();
+                
+                this.startScanningPhase();
+            }
+
+            drawTopUI() {
+                const isSaved = StorageManager.getSaved().includes(this.currentStageNum);
+                this.saveBtn = this.add.text(320, 20, isSaved ? '⭐ 保存済' : '☆ 保存', { fontSize: '14px', color: isSaved ? '#f1c40f' : '#ffffff', fontStyle: 'bold', backgroundColor: '#333', padding: 6 })
+                    .setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(9999)
+                    .on('pointerdown', () => {
+                        const nowSaved = StorageManager.toggleSave(this.currentStageNum);
+                        this.saveBtn.setText(nowSaved ? '⭐ 保存済' : '☆ 保存').setColor(nowSaved ? '#f1c40f' : '#ffffff');
+                    });
+                this.add.text(40, 20, '🏠', { fontSize: '24px', backgroundColor: '#333', padding: 4 })
+                    .setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(9999)
+                    .on('pointerdown', () => this.scene.start('TitleScene'));
+            }
+
+            drawStampBook() {
+                this.add.rectangle(195, 780, 360, 80, 0xffffff, 0.95).setDepth(8000).setStrokeStyle(4, 0xf39c12);
+                this.add.text(195, 755, '★ スタンプカード ★', {fontSize: '16px', color: '#e67e22', fontStyle: 'bold'}).setOrigin(0.5).setDepth(8001);
+                for (let i = 0; i < 5; i++) {
+                    const cx = 75 + (i * 60);
+                    this.add.circle(cx, 790, 22, 0xecf0f1, 1).setDepth(8001).setStrokeStyle(2, 0xbdc3c7);
+                    if (i < this.stamps) this.add.text(cx, 790, '⚽', {fontSize: '32px'}).setOrigin(0.5).setDepth(8002);
+                }
+            }
+
+            showSpeechBubble(target, message, isHighlight = false) {
+                const depth = isHighlight ? 7000 : 4000;
+                const bubble = this.add.text(target.x, target.y - 65, `💬 ${message}`, { 
+                    fontSize: '18px', color: '#000', backgroundColor: '#fff', padding: 6, fontStyle: 'bold', stroke: '#000', strokeThickness: 1
+                }).setOrigin(0.5).setDepth(depth);
+                this.dynamicBubbles.push({ textObj: bubble, target: target, baseOffset: -65 });
+                this.uiElements.push(bubble);
+            }
+
+            startScanningPhase() {
+                this.currentState = this.STATE.SCANNING;
+                const cdBg = this.add.rectangle(195, 422, 390, 844, 0x000000, 0.4).setDepth(5999);
+                const cdTxt = this.add.text(195, 300, `ステージ ${this.currentStageNum}\n\nがめんを こすって\nまわりを みよう！`, { fontSize: '32px', color: '#fff', fontStyle: 'bold', align: 'center' }).setOrigin(0.5).setDepth(6000);
+
+                this.showSpeechBubble(this.passer, 'パスだすぞ！', true);
+
+                let count = 3;
+                this.time.addEvent({
+                    delay: 1000, repeat: 4,
+                    callback: () => {
+                        if (count > 0) cdTxt.setText(count.toString()).setFontSize('80px');
+                        else if (count === 0) cdTxt.setText('GO!').setFontSize('80px').setColor('#ff0');
+                        else {
+                            cdTxt.destroy(); cdBg.destroy();
+                            this.currentState = this.STATE.PLANNING;
+                            this.clearUI(); 
+                            this.showSpeechBubble(this.player, 'ヘイ！パス！');
+                            const t = this.add.text(195, 100, 'パスのもらいかたを かいて！', { fontSize: '20px', backgroundColor: '#000', padding: 5 }).setOrigin(0.5).setDepth(6000);
+                            this.uiElements.push(t);
+                        }
+                        count--;
+                    }
+                });
+            }
+
+            setupInput() {
+                this.input.on('pointerdown', (p) => {
+                    if (this.scene.isActive('ReceiveScene')) {
+                        this.updateVision(p.x, p.y);
+                        if (this.currentState !== this.STATE.PLANNING && this.currentState !== this.STATE.RE_PLANNING) return;
+                        if (this.isGameOver || p.y < 80 || p.y > 730) return;
+                        this.isDrawing = true;
+                        this.pathPoints = [{ x: this.player.x, y: this.player.y }];
+                    }
+                });
+
+                this.input.on('pointermove', (p) => {
+                    if (this.scene.isActive('ReceiveScene')) {
+                        if (p.isDown) this.updateVision(p.x, p.y);
+                        if (this.isDrawing) {
+                            const last = this.pathPoints[this.pathPoints.length - 1];
+                            if (Phaser.Math.Distance.Between(last.x, last.y, p.x, p.y) > 8) {
+                                this.pathPoints.push({ x: p.x, y: p.y });
+                                this.drawPath();
+                            }
+                        }
+                    }
+                });
+
+                this.input.on('pointerup', () => {
+                    if (this.scene.isActive('ReceiveScene') && this.isDrawing) {
+                        this.isDrawing = false;
+                        if (this.pathPoints.length > 5) this.handleDrawingComplete();
+                    }
+                });
+            }
+
+            updateVision(x, y) {
+                if (this.currentState === this.STATE.SCANNING || this.currentState === this.STATE.PLANNING) {
+                    this.brush.setPosition(x, y); this.fog.erase(this.brush);
+                }
+            }
+
+            update(time, delta) {
+                this.dynamicBubbles.forEach(b => b.textObj.setPosition(b.target.x, b.target.y + b.baseOffset));
+
+                const activeAIStates = [this.STATE.PLANNING, this.STATE.RUNNING, this.STATE.DECIDING, this.STATE.RE_PLANNING, this.STATE.EXECUTING];
+                if (!activeAIStates.includes(this.currentState) || this.isGameOver) return;
+
+                let speedFactor = 1.0;
+                if ([this.STATE.PLANNING, this.STATE.RE_PLANNING, this.STATE.DECIDING].includes(this.currentState)) {
+                    speedFactor = 0.2; // 20%接近
+                }
+                
+                let tX = this.player.x, tY = this.player.y;
+                if (this.ballHolder === 'decoy') { tX = this.decoy.x; tY = this.decoy.y; }
+                else if (this.ballHolder === 'passer') { tX = this.passer.x; tY = this.passer.y; }
+
+                this.enemies.forEach((enemy, index) => {
+                    let moveDist = this.ENEMY_SPEED * speedFactor * (delta / 1000);
+                    const angle = Phaser.Math.Angle.Between(enemy.x, enemy.y, tX, tY);
+                    
+                    enemy.bodyGraphics.setRotation(angle);
+                    enemy.x += Math.cos(angle) * moveDist;
+                    enemy.y += Math.sin(angle) * moveDist;
+                    
+                    this.cautionZones[index].setPosition(enemy.x, enemy.y).setVisible(true);
+                    this.enemyZones[index].setPosition(enemy.x, enemy.y).setVisible(true);
+
+                    this.enemies.forEach((otherEnemy, otherIndex) => {
+                        if (index !== otherIndex && speedFactor > 0) {
+                            if (Phaser.Math.Distance.Between(enemy.x, enemy.y, otherEnemy.x, otherEnemy.y) < 40) {
+                                const pushAngle = Phaser.Math.Angle.Between(otherEnemy.x, otherEnemy.y, enemy.x, enemy.y);
+                                enemy.x += Math.cos(pushAngle) * 1.5;
+                                enemy.y += Math.sin(pushAngle) * 1.5;
+                            }
+                        }
+                    });
+
+                    if (this.currentState !== this.STATE.RE_PLANNING && this.currentState !== this.STATE.PLANNING && this.currentState !== this.STATE.DECIDING) {
+                        let isCollision = false;
+                        if (this.ball && this.ballHolder === 'none' && !this.isGameOver) {
+                            if (Phaser.Math.Distance.Between(this.ball.x, this.ball.y, enemy.x, enemy.y) < this.INTERCEPT_RADIUS) {
+                                this.failSimulation('pass', enemy); isCollision = true;
+                            }
+                        }
+                        if (!isCollision && !this.isGameOver) {
+                            if (this.ballHolder === 'player' && Phaser.Math.Distance.Between(this.player.x, this.player.y, enemy.x, enemy.y) < this.INTERCEPT_RADIUS) {
+                                this.failSimulation('player', enemy);
+                            } else if (this.ballHolder === 'decoy' && Phaser.Math.Distance.Between(this.decoy.x, this.decoy.y, enemy.x, enemy.y) < this.INTERCEPT_RADIUS) {
+                                this.failSimulation('decoy', enemy);
+                            } else if (this.ballHolder === 'passer' && Phaser.Math.Distance.Between(this.passer.x, this.passer.y, enemy.x, enemy.y) < this.INTERCEPT_RADIUS) {
+                                this.failSimulation('passer', enemy);
+                            }
+                        }
+                    }
+                });
+
+                this.updateOffTheBallMovement(delta, speedFactor);
+            }
+
+            updateOffTheBallMovement(delta, speedFactor) {
+                const teammates = [this.passer, this.decoy];
+                teammates.forEach(tm => {
+                    const isHoldingBall = (this.ballHolder === 'player' && tm === this.player) || 
+                                          (this.ballHolder === 'decoy' && tm === this.decoy) ||
+                                          (this.ballHolder === 'passer' && tm === this.passer);
+                    if (isHoldingBall) return;
+
+                    let vx = 0, vy = -0.5;
+                    this.enemies.forEach(e => {
+                        const dist = Phaser.Math.Distance.Between(tm.x, tm.y, e.x, e.y);
+                        if (dist < 130) {
+                            const angle = Phaser.Math.Angle.Between(e.x, e.y, tm.x, tm.y);
+                            vx += Math.cos(angle) * (130 - dist) * 0.15;
+                            vy += Math.sin(angle) * (130 - dist) * 0.15;
+                        }
+                    });
+
+                    const distP = Phaser.Math.Distance.Between(tm.x, tm.y, this.player.x, this.player.y);
+                    if (distP < 100) {
+                        const angleP = Phaser.Math.Angle.Between(this.player.x, this.player.y, tm.x, tm.y);
+                        vx += Math.cos(angleP) * (100 - distP) * 0.1;
+                        vy += Math.sin(angleP) * (100 - distP) * 0.1;
+                    } else if (distP > 220) {
+                        const angleP = Phaser.Math.Angle.Between(tm.x, tm.y, this.player.x, this.player.y);
+                        vx += Math.cos(angleP) * 0.5;
+                        vy += Math.sin(angleP) * 0.5;
+                    }
+
+                    const len = Math.sqrt(vx*vx + vy*vy);
+                    if (len > 0) {
+                        const moveSpeed = 45 * speedFactor * (delta / 1000);
+                        tm.x += (vx / len) * moveSpeed;
+                        tm.y += (vy / len) * moveSpeed;
+                        tm.bodyGraphics.setRotation(Math.atan2(vy, vx));
+                    }
+                    tm.x = Phaser.Math.Clamp(tm.x, 30, 360);
+                    tm.y = Phaser.Math.Clamp(tm.y, 80, 720);
+                });
+            }
+
+            handleDrawingComplete() {
+                if (this.currentState === this.STATE.PLANNING) {
+                    this.clearUI();
+                    this.addMenuButton(195, 600, '👟 あしもと！', () => { this.passType='feet'; this.startSim(); });
+                    this.addMenuButton(195, 680, '⬆️ スペース！', () => { this.passType='space'; this.startSim(); });
+                } else if (this.currentState === this.STATE.RE_PLANNING) {
+                    this.currentState = this.STATE.EXECUTING;
+                    this.clearUI();
+                    if (this.planMode === 'dribble') this.execDribble(); 
+                    else if (this.planMode === 'pass') this.execPassToTeammate(); 
+                    else if (this.planMode === 'return') this.execReturnPass();
+                }
+            }
+
+            startSim() {
+                this.currentState = this.STATE.RUNNING; this.clearUI();
+                this.ballHolder = 'none';
+
+                const curve = new Phaser.Curves.Spline(this.pathPoints);
+                const destPoint = this.pathPoints[this.pathPoints.length - 1];
+                this.ball = this.add.circle(this.passer.x, this.passer.y, 8, 0xffffff).setDepth(6000);
+                
+                this.tweens.addCounter({
+                    from: 0, to: 1, duration: 1500,
+                    onUpdate: (tw) => {
+                        const p = curve.getPoint(tw.getValue());
+                        this.player.setPosition(p.x, p.y);
+                        if (tw.getValue() < 0.99) this.player.bodyGraphics.setRotation(Phaser.Math.Angle.Between(p.x, p.y, curve.getPoint(tw.getValue() + 0.01).x, curve.getPoint(tw.getValue() + 0.01).y));
+                    }
+                });
+
+                this.tweens.add({
+                    targets: this.ball, x: destPoint.x, y: destPoint.y, duration: 1500, ease: 'Sine.easeOut',
+                    onComplete: () => {
+                        this.ballHolder = 'player';
+                        if (this.passType === 'space') {
+                            this.tweens.add({
+                                targets: [this.player, this.ball], y: destPoint.y - 80, duration: 500,
+                                onComplete: () => this.askChange()
+                            });
+                        } else {
+                            this.askChange();
+                        }
+                    }
+                });
+            }
+
+            askChange() {
+                if (this.isGameOver) return;
+                this.currentState = this.STATE.DECIDING;
+                this.addMenuButton(195, 520, '⚽ シュート', () => this.execAction('shoot'));
+                this.addMenuButton(195, 600, '🏃 ドリブルにかえる', () => this.execAction('dribble'));
+                this.addMenuButton(195, 680, '🤝 味方にパス', () => this.execAction('pass'));
+            }
+
+            execAction(act) {
+                this.clearUI();
+                if (act === 'shoot') {
+                    this.currentState = this.STATE.EXECUTING;
+                    const success = Phaser.Geom.Polygon.Contains(this.shootZone, this.player.x, this.player.y);
+                    this.tweens.add({ targets: this.ball, x: 195, y: 40, duration: 300, onComplete: () => {
+                        if(success) this.win('✨ ナイスシュート！');
+                        else this.failSimulation('far', this.enemies[0]);
+                    }});
+                } else {
+                    this.planMode = act;
+                    this.currentState = this.STATE.RE_PLANNING;
+                    this.graphics.clear();
+                    let text = act === 'dribble' ? 'ドリブルのみちを かいて！' : 'パスのだしどころを かいて！';
+                    const t = this.add.text(195, 300, text, { fontSize: '24px', backgroundColor: '#000', padding: 5 }).setOrigin(0.5).setDepth(6000);
+                    this.uiElements.push(t);
+                }
+            }
+
+            execDribble() {
+                let hasShot = false; this.graphics.clear();
+                const curve = new Phaser.Curves.Spline(this.pathPoints);
+                let pathLength = 0;
+                for(let i=0; i<this.pathPoints.length-1; i++){
+                    pathLength += Phaser.Math.Distance.Between(this.pathPoints[i].x, this.pathPoints[i].y, this.pathPoints[i+1].x, this.pathPoints[i+1].y);
+                }
+                const duration = pathLength === 0 ? 100 : (pathLength / this.ENEMY_SPEED) * 1000;
+
+                this.dribbleTween = this.tweens.addCounter({
+                    from: 0, to: 1, duration: duration, // 等速化
+                    onUpdate: (tw) => { 
+                        if (this.isGameOver || hasShot) return;
+                        const p = curve.getPoint(tw.getValue()); 
+                        this.player.setPosition(p.x, p.y); this.ball.setPosition(p.x, p.y); 
+                        if (tw.getValue() < 0.99) this.player.bodyGraphics.setRotation(Phaser.Math.Angle.Between(p.x, p.y, curve.getPoint(tw.getValue() + 0.01).x, curve.getPoint(tw.getValue() + 0.01).y));
+                        
+                        if (Phaser.Geom.Polygon.Contains(this.shootZone, p.x, p.y)) {
+                            hasShot = true; this.dribbleTween.stop();
+                            this.tweens.add({ targets: this.ball, x: 195, y: 20, duration: 300, onComplete: () => this.win('✨ ドリブル突破！') });
+                        }
+                    },
+                    onComplete: () => { if(!this.isGameOver && !hasShot) this.askChange(); }
+                });
+            }
+
+            execPassToTeammate() {
+                if (this.isGameOver) return;
+                this.currentState = this.STATE.RUNNING;
+                this.graphics.clear(); this.clearUI();
+                this.ballHolder = 'none';
+                
+                const destPoint = this.pathPoints[this.pathPoints.length - 1];
+                const distToPasser = Phaser.Math.Distance.Between(destPoint.x, destPoint.y, this.passer.x, this.passer.y);
+                const distToDecoy = Phaser.Math.Distance.Between(destPoint.x, destPoint.y, this.decoy.x, this.decoy.y);
+                
+                const receiver = (distToPasser < distToDecoy) ? this.passer : this.decoy;
+                const receiverId = (distToPasser < distToDecoy) ? 'passer' : 'decoy';
+                
+                this.showSpeechBubble(receiver, 'ヘイ！パス！');
+                this.tweens.killTweensOf(receiver);
+                this.tweens.add({ targets: receiver, x: destPoint.x, y: destPoint.y, duration: 800 });
+                
+                this.tweens.add({
+                    targets: this.ball, x: destPoint.x, y: destPoint.y, duration: 800,
+                    onComplete: () => {
+                        if (this.isGameOver) return;
+                        if (Phaser.Math.Distance.Between(this.ball.x, this.ball.y, receiver.x, receiver.y) < 60) {
+                            if (Phaser.Geom.Polygon.Contains(this.shootZone, receiver.x, receiver.y)) {
+                                this.clearUI();
+                                this.tweens.add({ targets: this.ball, x: 195, y: 40, duration: 300, onComplete: () => this.win('✨ 完璧な連携！') });
+                            } else {
+                                this.ballHolder = receiverId;
+                                this.currentState = this.STATE.RE_PLANNING; this.planMode = 'return';
+                                this.graphics.clear(); this.clearUI();
+                                this.showSpeechBubble(this.player, 'リターン！');
+                                const t = this.add.text(195, 300, 'パスをもらうみちを かいて！', { fontSize: '24px', backgroundColor: '#000', padding: 5 }).setOrigin(0.5).setDepth(6000);
+                                this.uiElements.push(t);
+                            }
+                        } else this.failSimulation('miss', this.enemies[0]);
+                    }
+                });
+            }
+
+            execReturnPass() {
+                this.currentState = this.STATE.RUNNING; this.clearUI(); this.graphics.clear();
+                const sender = this.ballHolder === 'passer' ? this.passer : this.decoy;
+                this.ballHolder = 'none';
+
+                const curve = new Phaser.Curves.Spline(this.pathPoints);
+                const destPoint = this.pathPoints[this.pathPoints.length - 1];
+
+                this.showSpeechBubble(sender, 'はいよ！', true);
+                this.tweens.add({ targets: this.ball, x: destPoint.x, y: destPoint.y, duration: 1200, ease: 'Sine.easeOut' });
+                this.tweens.addCounter({
+                    from: 0, to: 1, duration: 1200,
+                    onUpdate: (tw) => {
+                        if (this.isGameOver) return;
+                        const p = curve.getPoint(tw.getValue());
+                        this.player.setPosition(p.x, p.y);
+                        if (tw.getValue() < 0.99) this.player.bodyGraphics.setRotation(Phaser.Math.Angle.Between(p.x, p.y, curve.getPoint(tw.getValue() + 0.01).x, curve.getPoint(tw.getValue() + 0.01).y));
+                    },
+                    onComplete: () => {
+                        if (this.isGameOver) return;
+                        this.ballHolder = 'player';
+                        if (Phaser.Geom.Polygon.Contains(this.shootZone, this.player.x, this.player.y)) {
+                            this.currentState = this.STATE.EXECUTING;
+                            this.showSpeechBubble(this.player, 'もらった！', true);
+                            this.tweens.add({ targets: this.ball, x: 195, y: 20, duration: 300, onComplete: () => this.win('✨ ダイレクトボレー！') });
+                        } else this.askChange(); 
+                    }
+                });
+            }
+
+            failSimulation(reason, caughtByEnemy) { 
+                if (this.isGameOver) return;
+                this.isGameOver = true; this.currentState = this.STATE.FINISHED;
+                this.tweens.killAll(); this.clearUI(); 
+                this.enemyZones.forEach(z => z.setFillStyle(0xff0000, 0.6)); 
+
+                let target = this.player;
+                if (reason === 'decoy') target = this.decoy;
+                else if (reason === 'passer') target = this.passer;
+                
+                if (caughtByEnemy) this.showSpeechBubble(caughtByEnemy, '💨 つかまえた！', true);
+                if(target.list[1]) target.list[1].setText('😵 ぐるぐる…');
+
+                this.tweens.add({ targets: target, angle: 1080, scale: 0.5, duration: 1200, ease: 'Cubic.easeOut' });
+                this.time.delayedCall(2200, () => {
+                    this.scene.restart({ stage: this.currentStageNum, mode: this.playMode });
+                });
+            }
+
+            win(m) { 
+                if (this.isGameOver) return;
+                this.isGameOver = true; this.currentState = this.STATE.FINISHED;
+                this.tweens.killAll(); this.clearUI();
+                
+                this.cameras.main.shake(300, 0.01);
+                const emitter = this.add.particles(195, 40, 'confettiTex', { speed: { min: 200, max: 800 }, angle: { min: 0, max: 180 }, gravityY: 1000, scale: { start: 1, end: 0 }, tint: [ 0xf1c40f, 0xe74c3c, 0x3498db, 0x2ecc71, 0x9b59b6, 0xffffff ], lifespan: 2500, quantity: 100, emitting: false }).setDepth(9999);
+                emitter.explode();
+
+                let nextStage = this.currentStageNum;
+                if (this.playMode === 'normal') {
+                    nextStage = STAGE_CONFIG[this.currentStageNum + 1] ? this.currentStageNum + 1 : 1;
+                    StorageManager.updateHighestStage(nextStage);
+                    this.stamps += 1;
+                    let isCardFull = (this.stamps >= 5);
+                    m = isCardFull ? '👑 カード コンプリート！' : m;
+                    if (isCardFull) this.registry.set('stamps', 0);
+                    else this.registry.set('stamps', this.stamps);
+                }
+
+                this.add.text(195, 300, m, { fontSize: '28px', color: '#ffff00', backgroundColor: '#000000', padding: 15, align: 'center', fontStyle: 'bold' }).setOrigin(0.5).setDepth(9000);
+                if (this.playMode === 'saved') {
+                    this.addMenuButton(195, 420, '🏠 タイトルへもどる', () => this.scene.start('TitleScene'));
+                } else {
+                    this.addMenuButton(195, 420, '▶️ つぎのステージへ！', () => this.scene.restart({ stage: nextStage, mode: 'normal' }));
+                    this.addMenuButton(195, 500, '🏠 おわる (タイトルへ)', () => this.scene.start('TitleScene'));
+                }
+            }
+
+            createCharacter(x, y, color, labelText, isPlayer = false) {
+                const container = this.add.container(x, y);
+                const g = this.add.graphics();
+                g.fillStyle(color).lineStyle(3, 0xffffff).beginPath().moveTo(20, 0).lineTo(-15, 15).lineTo(-15, -15).closePath().fillPath().strokePath();
+                g.fillStyle(0xffffff).fillCircle(5, -7, 5).fillCircle(5, 7, 5).fillStyle(0x000).fillCircle(7, -7, 2).fillCircle(7, 7, 2);
+                g.setRotation(-Math.PI / 2); 
+                container.bodyGraphics = g; container.add(g);
+                if (labelText) {
+                    const txt = this.add.text(0, -40, labelText, { fontSize: '16px', color: '#fff', stroke: '#000', strokeThickness: 4, fontStyle: 'bold' }).setOrigin(0.5);
+                    container.add(txt);
+                    if (isPlayer) this.tweens.add({ targets: txt, y: -50, duration: 400, yoyo: true, repeat: -1 });
+                }
+                return container;
+            }
+
+            drawPath() {
+                this.graphics.clear().lineStyle(6, 0xffffff, 0.8).beginPath().moveTo(this.pathPoints[0].x, this.pathPoints[0].y);
+                this.pathPoints.forEach(p => this.graphics.lineTo(p.x, p.y)); this.graphics.strokePath();
+            }
+            clearUI() { this.uiElements.forEach(e => e.destroy()); this.uiElements = []; this.dynamicBubbles = []; }
+            addMenuButton(x, y, text, callback) {
+                const bg = this.add.rectangle(x, y, 280, 60, 0xffffff).setInteractive({ useHandCursor: true }).on('pointerdown', callback).setDepth(8000);
+                const txt = this.add.text(x, y, text, { fontSize: '20px', color: '#333', fontStyle: 'bold' }).setOrigin(0.5).setDepth(8001);
+                this.uiElements.push(bg, txt);
+            }
         }
 
+        // --- 【最新進化版】ディフェンスモードシーン (予測ライン非表示・左右ランダム) ---
         class DefenseScene extends Phaser.Scene {
             constructor() { super('DefenseScene'); }
 
@@ -62,42 +622,33 @@
                     .setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(9999)
                     .on('pointerdown', () => this.scene.start('TitleScene'));
 
-                // 【拡張ポイント】相手2（レシーバー）の走り込む先を「左右ランダム」に決定
-                // 50%の確率で右（280）、50%の確率で左（110）になる
+                // 左右ランダムターゲット決定
                 const isRightTarget = Math.random() < 0.5;
                 this.passTargetX = isRightTarget ? 280 : 110;
                 this.passTargetY = 320;
 
-                // 初期レシーバーの位置（ターゲットと逆側に配置して、鋭く斜めに走り込ませる）
                 const initialReceiverX = isRightTarget ? 100 : 290;
 
-                // オフェンスチーム（黄色）
+                // オフェンス（黄色）
                 this.passer = this.createVisualChar(195, 680, 0xf1c40f, '⚽ 相手1 (パサー)');
                 this.receiver = this.createVisualChar(initialReceiverX, 350, 0xf1c40f, '🏃 相手2 (レシーバー)');
                 this.ball = this.add.circle(this.passer.x, this.passer.y, 8, 0xffffff).setDepth(5000);
 
-                // ディフェンスチーム
+                // ディフェンス
                 this.dfPartner = this.createVisualChar(195, 580, 0x3498db, '👤 味方DF'); 
                 this.playerDF = this.createVisualChar(195, 480, 0xe74c3c, '🛡️ あなた'); 
                 this.playerDF.setAlpha(0.6);
 
-                // 攻撃の予測軌道線（動的に左右へ切り替わる）
-                this.pathGraphics = this.add.graphics();
-                this.pathGraphics.lineStyle(4, 0xffffff, 0.25);
-                this.pathGraphics.strokeLineShape(new Phaser.Geom.Line(this.passer.x, this.passer.y, this.passTargetX, this.passTargetY));
-
-                // ガイドUI
-                this.guideText = this.add.text(195, 150, '白い線のスペースに パスがでるぞ！\nコースを切る場所を タップで 選ぼう！', {
-                    fontSize: '17px', color: '#fff', backgroundColor: '#000', padding: 8, align: 'center', fontStyle: 'bold'
+                // ガイドUI (予測線は完全に非表示)
+                this.guideText = this.add.text(195, 150, '相手1・2の動きを 予測して、\n守る場所を タップで 選ぼう！', {
+                    fontSize: '18px', color: '#fff', backgroundColor: '#000', padding: 8, align: 'center', fontStyle: 'bold'
                 }).setOrigin(0.5);
 
-                // タップでポジション選択
                 this.input.on('pointerdown', (pointer) => {
                     if (this.isPhaseFinished || pointer.y < 100 || pointer.y > 600) return;
                     
                     this.playerDF.setPosition(pointer.x, pointer.y);
                     this.playerDF.setAlpha(1.0);
-                    
                     if (this.guideText) this.guideText.destroy();
                     this.startTacticalSimulation();
                 });
@@ -106,28 +657,27 @@
             startTacticalSimulation() {
                 this.isPhaseFinished = true;
 
-                // 1. 味方DF(青)のプレス
+                // 味方DFのプレス
                 this.tweens.add({
                     targets: this.dfPartner,
                     x: this.passer.x, y: this.passer.y + 40,
                     duration: 1000, ease: 'Quad.easeOut'
                 });
 
-                // 2. 相手2(レシーバー)がランダムに決まったスペースへ走り出す
+                // レシーバーの走り込み
                 this.tweens.add({
                     targets: this.receiver,
                     x: this.passTargetX, y: this.passTargetY,
                     duration: 1200, ease: 'Sine.easeInOut'
                 });
 
-                // 3. パス始動
+                // パスワーク始動
                 this.time.delayedCall(300, () => {
                     this.tweens.add({
                         targets: this.ball,
                         x: this.passTargetX, y: this.passTargetY,
                         duration: 900, ease: 'Linear',
                         onUpdate: () => {
-                            // 動的なパスカット判定
                             const distToBall = Phaser.Math.Distance.Between(this.playerDF.x, this.playerDF.y, this.ball.x, this.ball.y);
                             if (distToBall < 35 && !this.hasJudged) {
                                 this.hasJudged = true;
@@ -146,8 +696,7 @@
                 const distToReceiver = Phaser.Math.Distance.Between(this.playerDF.x, this.playerDF.y, this.receiver.x, this.receiver.y);
 
                 if (distToReceiver < 65) {
-                    // 確率70%でタックル成功
-                    if (Math.random() < 0.7) {
+                    if (Math.random() < 0.7) { // 確率70%
                         this.triggerResult(true, '⚔️ ナイスアプローチ！\n前を向かせずに ボールをうばった！');
                     } else {
                         this.execOffenseGoalAnimation('😵 おしい！\nよせきれず かわされてしまった…');
@@ -169,7 +718,6 @@
             triggerResult(isWin, message) {
                 this.tweens.killAll();
                 const color = isWin ? '#2ecc71' : '#e74c3c';
-                
                 this.add.rectangle(195, 450, 340, 120, 0x000000, 0.85).setDepth(9000).setStrokeStyle(3, color);
                 this.add.text(195, 450, message, {
                     fontSize: '20px', color: '#fff', fontStyle: 'bold', align: 'center', lineHeight: 1.5
@@ -189,6 +737,7 @@
             }
         }
 
+        // --- 全シーンのエントリー登録 ---
         const config = { 
             type: Phaser.AUTO, 
             scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH, width: 390, height: 844 }, 
