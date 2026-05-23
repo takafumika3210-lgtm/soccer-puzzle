@@ -6,7 +6,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <title>サッカーパズル - Tactical Ultimate Edition</title>
+    <title>サッカーパズル - Tactical Complete Masters</title>
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
     <style>
         @media screen and (orientation: landscape) {
@@ -43,9 +43,18 @@
                     const current = StorageManager.getHighestStage();
                     if (stageNum > current && stageNum <= 10) localStorage.setItem('soccer_highest_stage', stageNum);
                 } catch(e) {}
+            },
+            // ディフェンス編用のステージ保存
+            getHighestDefStage: () => { try { return parseInt(localStorage.getItem('soccer_highest_def_stage')) || 1; } catch(e) { return 1; } },
+            updateHighestDefStage: (stageNum) => {
+                try {
+                    const current = StorageManager.getHighestDefStage();
+                    if (stageNum > current && stageNum <= 10) localStorage.setItem('soccer_highest_def_stage', stageNum);
+                } catch(e) {}
             }
         };
 
+        // オフェンス編用ステージ設定
         const STAGE_CONFIG = {
             1: { player: { x: 195, y: 650 }, passer: { x: 195, y: 750 }, decoy: { x: 80, y: 650 }, enemies: [{ x: 100, y: 400 }] },
             2: { player: { x: 195, y: 650 }, passer: { x: 195, y: 750 }, decoy: { x: 300, y: 650 }, enemies: [{ x: 280, y: 400 }] },
@@ -59,43 +68,64 @@
             10: { player: { x: 195, y: 550 }, passer: { x: 80, y: 700 }, decoy: { x: 300, y: 700 }, enemies: [{ x: 130, y: 380 }, { x: 260, y: 380 }] }
         };
 
+        // 【新規】ディフェンス編用 10ステージ戦術配置設計（難易度連動・配置バラバラ）
+        const DEFENSE_STAGE_CONFIG = {
+            1: { name: '中央から右へのスルーパス', passer: { x: 195, y: 680 }, receiver: { x: 140, y: 360 }, target: { x: 280, y: 320 }, speed: 900, driveY: 610, intensity: 'strong' },
+            2: { name: '中央から左へのスルーパス', passer: { x: 195, y: 680 }, receiver: { x: 250, y: 360 }, target: { x: 110, y: 320 }, speed: 900, driveY: 610, intensity: 'strong' },
+            3: { name: '左サイドからの対角パス', passer: { x: 90, y: 660 }, receiver: { x: 150, y: 350 }, target: { x: 290, y: 290 }, speed: 850, driveY: 590, intensity: 'strong' },
+            4: { name: '右サイドからの対角パス', passer: { x: 300, y: 660 }, receiver: { x: 240, y: 350 }, target: { x: 100, y: 290 }, speed: 850, driveY: 590, intensity: 'strong' },
+            5: { name: '中央突破のショートくさび', passer: { x: 195, y: 700 }, receiver: { x: 195, y: 260 }, target: { x: 195, y: 430 }, speed: 1200, driveY: 640, intensity: 'weak' },
+            6: { name: '左サイド引きつけての縦突破', passer: { x: 80, y: 680 }, receiver: { x: 110, y: 380 }, target: { x: 80, y: 180 }, speed: 750, driveY: 600, intensity: 'medium' },
+            7: { name: '右サイド引きつけての縦突破', passer: { x: 310, y: 680 }, receiver: { x: 280, y: 380 }, target: { x: 310, y: 180 }, speed: 750, driveY: 600, intensity: 'medium' },
+            8: { name: '右ワイドからの内側カットイン', passer: { x: 320, y: 650 }, receiver: { x: 310, y: 320 }, target: { x: 170, y: 250 }, speed: 800, driveY: 580, intensity: 'strong' },
+            9: { name: '左ワイドからの内側カットイン', passer: { x: 70, y: 650 }, receiver: { x: 80, y: 320 }, target: { x: 220, y: 250 }, speed: 800, driveY: 580, intensity: 'strong' },
+            10: { name: '決戦：裏への超高速スルーパス', passer: { x: 150, y: 710 }, receiver: { x: 100, y: 340 }, target: { x: 300, y: 200 }, speed: 650, driveY: 620, intensity: 'strong' }
+        };
+
         // --- タイトルシーン ---
         class TitleScene extends Phaser.Scene {
             constructor() { super('TitleScene'); }
             create() {
                 this.cameras.main.setBackgroundColor('#2ecc71');
-                this.add.text(195, 100, 'サッカー パズル！', { fontSize: '38px', color: '#ffffff', fontStyle: 'bold' }).setOrigin(0.5);
+                this.add.text(195, 90, 'サッカー パズル！', { fontSize: '38px', color: '#ffffff', fontStyle: 'bold' }).setOrigin(0.5);
                 
                 if (!this.registry.has('stamps')) this.registry.set('stamps', 0);
                 const highestStage = StorageManager.getHighestStage();
+                const highestDefStage = StorageManager.getHighestDefStage();
                 
-                this.add.rectangle(195, 200, 320, 55, 0xf1c40f).setInteractive({ useHandCursor: true })
+                // オフェンスボタン群
+                this.add.rectangle(195, 190, 320, 50, 0xf1c40f).setInteractive({ useHandCursor: true })
                     .on('pointerdown', () => this.scene.start('ReceiveScene', { stage: highestStage, mode: 'normal' }));
-                this.add.text(195, 200, `🏃 つづきから (ST ${highestStage})`, { fontSize: '20px', color: '#333', fontStyle: 'bold' }).setOrigin(0.5);
+                this.add.text(195, 190, `🏃 こうげき (ST ${highestStage} から)`, { fontSize: '18px', color: '#333', fontStyle: 'bold' }).setOrigin(0.5);
 
-                this.add.rectangle(195, 275, 320, 55, 0xffffff).setInteractive({ useHandCursor: true })
+                this.add.rectangle(195, 255, 320, 50, 0xffffff).setInteractive({ useHandCursor: true })
                     .on('pointerdown', () => this.scene.start('ReceiveScene', { stage: 1, mode: 'normal' }));
-                this.add.text(195, 275, '🔄 はじめから (こうげき)', { fontSize: '20px', color: '#333', fontStyle: 'bold' }).setOrigin(0.5);
+                this.add.text(195, 255, '🔄 こうげき を はじめから', { fontSize: '18px', color: '#333', fontStyle: 'bold' }).setOrigin(0.5);
 
-                this.add.rectangle(195, 350, 320, 55, 0xe74c3c).setInteractive({ useHandCursor: true })
-                    .on('pointerdown', () => this.scene.start('DefenseScene'));
-                this.add.text(195, 350, '🛡️ ディフェンス編 (まもり)', { fontSize: '20px', color: '#fff', fontStyle: 'bold' }).setOrigin(0.5);
+                // 【拡張】ディフェンスボタン群
+                this.add.rectangle(195, 335, 320, 50, 0xe74c3c).setInteractive({ useHandCursor: true })
+                    .on('pointerdown', () => this.scene.start('DefenseScene', { stage: highestDefStage }));
+                this.add.text(195, 335, `🛡️ まもり (ST ${highestDefStage} から)`, { fontSize: '18px', color: '#fff', fontStyle: 'bold' }).setOrigin(0.5);
+
+                this.add.rectangle(195, 400, 320, 50, 0x95a5a6).setInteractive({ useHandCursor: true })
+                    .on('pointerdown', () => this.scene.start('DefenseScene', { stage: 1 }));
+                this.add.text(195, 400, '🔄 まもり を はじめから', { fontSize: '18px', color: '#fff', fontStyle: 'bold' }).setOrigin(0.5);
 
                 this.drawSavedStages();
             }
 
             drawSavedStages() {
                 const saved = StorageManager.getSaved();
-                this.add.text(195, 450, '⭐ お気に入り の ステージ', { fontSize: '20px', color: '#ffffff', fontStyle: 'bold' }).setOrigin(0.5);
+                this.add.text(195, 480, '⭐ お気に入り の ステージ (こうげき)', { fontSize: '18px', color: '#ffffff', fontStyle: 'bold' }).setOrigin(0.5);
                 if (saved.length === 0) {
-                    this.add.text(195, 500, 'まだ ないよ！', { fontSize: '16px', color: '#ecf0f1' }).setOrigin(0.5); return;
+                    this.add.text(195, 520, 'まだ ないよ！', { fontSize: '16px', color: '#ecf0f1' }).setOrigin(0.5); return;
                 }
                 saved.forEach((stageNum, index) => {
                     const col = index % 4; const row = Math.floor(index / 4);
-                    const x = 60 + col * 90; const y = 510 + row * 70;
-                    this.add.rectangle(x, y, 75, 50, 0x3498db).setInteractive({ useHandCursor: true })
+                    const x = 60 + col * 90; const y = 560 + row * 65;
+                    this.add.rectangle(x, y, 75, 45, 0x3498db).setInteractive({ useHandCursor: true })
                         .on('pointerdown', () => this.scene.start('ReceiveScene', { stage: stageNum, mode: 'saved' }));
-                    this.add.text(x, y, `ST ${stageNum}`, { fontSize: '16px', color: '#fff', fontStyle: 'bold' }).setOrigin(0.5);
+                    this.add.text(x, y, `ST ${stageNum}`, { fontSize: '15px', color: '#fff', fontStyle: 'bold' }).setOrigin(0.5);
                 });
             }
         }
@@ -599,78 +629,60 @@
             }
         }
 
-        // --- ディフェンスモードシーン (新・4大戦術パターン完全搭載) ---
+        // --- 【超絶進化版】ディフェンスモードシーン (10ステージ制・シビア判定・UI完備) ---
         class DefenseScene extends Phaser.Scene {
             constructor() { super('DefenseScene'); }
 
+            init(data) {
+                // 現在のディフェンスステージ数をロード
+                this.currentDefStageNum = data ? (data.stage || 1) : 1;
+                this.tacticalPattern = DEFENSE_STAGE_CONFIG[this.currentDefStageNum] || DEFENSE_STAGE_CONFIG[1];
+            }
+
             create() {
-                this.cameras.main.setBackgroundColor('#27ae60');
-                
-                this.defenseState = 'COUNTDOWN'; // COUNTDOWN -> SELECTING -> SIMULATING -> FINISHED
+                this.cameras.main.setBackgroundColor('#2c3e50'); // 守備編はダークグリーン芝
+                this.add.rectangle(195, 422, 390, 844, 0x27ae60).setDepth(0); // ピッチ色
+
+                this.defenseState = 'COUNTDOWN';
                 this.hasJudged = false;
                 this.dynamicBubbles = [];
                 this.uiElements = [];
-                this.countdownTime = 3000; // 3秒カウントダウン
+                this.countdownTime = 3000; 
+
+                // 上部インフォメーションバー
+                this.add.rectangle(195, 25, 390, 50, 0x111111, 0.6).setDepth(8000);
+                this.add.text(195, 25, `🛡️ まもり STAGE ${this.currentDefStageNum} / 10`, { fontSize: '16px', color: '#fff', fontStyle: 'bold' }).setOrigin(0.5).setDepth(8001);
+                this.add.text(195, 45, `戦術: ${this.tacticalPattern.name}`, { fontSize: '11px', color: '#f1c40f' }).setOrigin(0.5).setDepth(8001);
 
                 // ゴールエリア
-                this.add.rectangle(195, 20, 200, 40, 0xffffff, 0.9).setStrokeStyle(4, 0xe74c3c);
-                this.add.text(195, 20, 'G O A L', { fontSize: '28px', color: '#e74c3c', fontStyle: 'bold' }).setOrigin(0.5);
+                this.add.rectangle(195, 75, 200, 35, 0xffffff, 0.9).setStrokeStyle(3, 0xe74c3c);
+                this.add.text(195, 75, 'G O A L', { fontSize: '22px', color: '#e74c3c', fontStyle: 'bold' }).setOrigin(0.5);
 
                 // ホームボタン
-                this.add.text(40, 30, '🏠', { fontSize: '24px', backgroundColor: '#333', padding: 4 })
+                this.add.text(35, 25, '🏠', { fontSize: '22px', backgroundColor: '#333', padding: 4 })
                     .setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(9999)
                     .on('pointerdown', () => this.scene.start('TitleScene'));
 
-                // 【バリエーション大拡張】実戦的な4大戦術パターンパッケージ
-                const isRight = Math.random() < 0.5;
-                const patterns = [
-                    {
-                        name: '裏抜けスルーパス (強)',
-                        initX: isRight ? 130 : 260, initY: 410,
-                        targetX: isRight ? 290 : 100, targetY: 220,
-                        passSpeed: 700, passerDriveY: 580, intensity: 'strong'
-                    },
-                    {
-                        name: '足元へのくさびパス (弱)',
-                        initX: isRight ? 140 : 250, initY: 280,
-                        targetX: isRight ? 170 : 220, targetY: 420,
-                        passSpeed: 1200, passerDriveY: 630, intensity: 'weak'
-                    },
-                    {
-                        name: '縦へのスピード突破 (中)',
-                        initX: isRight ? 290 : 100, initY: 380,
-                        targetX: isRight ? 290 : 100, targetY: 180,
-                        passSpeed: 900, passerDriveY: 600, intensity: 'medium'
-                    },
-                    {
-                        name: '中央へのクロス切り込み (強)',
-                        initX: isRight ? 310 : 80,  initY: 340,
-                        targetX: 195, targetY: 260,
-                        passSpeed: 750, passerDriveY: 570, intensity: 'strong'
-                    }
-                ];
-
-                // ランダムに1つの戦術パターンを決定
-                this.tacticalPattern = Phaser.Utils.Array.GetRandom(patterns);
-                
                 this.passTargetX = this.tacticalPattern.targetX;
                 this.passTargetY = this.tacticalPattern.targetY;
 
-                // キャラクター初期配置
-                this.passer = this.createVisualChar(195, 680, 0xf1c40f, '⚽ 相手1 (パサー)');
-                this.receiver = this.createVisualChar(this.tacticalPattern.initX, this.tacticalPattern.initY, 0xf1c40f, '🏃 相手2 (レシーバー)');
+                // キャラクター初期配置（ステージごとにバラバラの位置！）
+                this.passer = this.createVisualChar(this.tacticalPattern.passer.x, this.tacticalPattern.passer.y, 0xf1c40f, '⚽ パサー');
+                this.receiver = this.createVisualChar(this.tacticalPattern.initX, this.tacticalPattern.initY, 0xf1c40f, '🏃 レシーバー');
                 this.ball = this.add.circle(this.passer.x, this.passer.y, 8, 0xffffff).setDepth(5000);
 
-                this.dfPartner = this.createVisualChar(195, 580, 0x3498db, '👤 味方DF'); 
+                // ディフェンダー（初期配置もパサーに合わせて変化）
+                this.dfPartner = this.createVisualChar(this.tacticalPattern.passer.x, this.tacticalPattern.passer.y - 90, 0x3498db, '👤 味方DF'); 
+                
+                // あなた（最初は半透明で、タップした場所に配置される）
                 this.playerDF = this.createVisualChar(195, 480, 0xe74c3c, '🛡️ あなた'); 
-                this.playerDF.setAlpha(0.3).setVisible(false);
+                this.playerDF.setAlpha(0.2).setVisible(false);
 
                 this.showSpeechBubble(this.receiver, 'ヘイ！パス！');
 
-                // カウントダウンテキスト生成
-                this.cdText = this.add.text(195, 220, '3', { fontSize: '90px', color: '#fff', fontStyle: 'bold' }).setOrigin(0.5).setDepth(9000);
+                // カウントダウンUI
+                this.cdText = this.add.text(195, 260, '3', { fontSize: '90px', color: '#fff', fontStyle: 'bold' }).setOrigin(0.5).setDepth(9000);
                 
-                // 3.2.1 タイマーイベント
                 let count = 2;
                 this.time.addEvent({
                     delay: 1000, repeat: 2,
@@ -682,7 +694,7 @@
                             this.defenseState = 'SELECTING';
                             this.playerDF.setVisible(true);
                             
-                            this.guideText = this.add.text(195, 130, '今の動き出しを 予測して、\nコースを切る場所を タップで選べ！', {
+                            this.guideText = this.add.text(195, 150, '今のうごきだしから コースをよめ！\nまもる場所を タップで決定！', {
                                 fontSize: '18px', color: '#fff', backgroundColor: '#000', padding: 8, align: 'center', fontStyle: 'bold'
                             }).setOrigin(0.5);
                         }
@@ -690,9 +702,9 @@
                     }
                 });
 
-                // ポジション選択
+                // タップで守備位置決定
                 this.input.on('pointerdown', (pointer) => {
-                    if (this.defenseState !== 'SELECTING' || pointer.y < 100 || pointer.y > 600) return;
+                    if (this.defenseState !== 'SELECTING' || pointer.y < 120 || pointer.y > 620) return;
                     
                     this.playerDF.setPosition(pointer.x, pointer.y);
                     this.playerDF.setAlpha(1.0);
@@ -706,24 +718,25 @@
             startTacticalSimulation() {
                 this.defenseState = 'SIMULATING';
 
-                // 1. レシーバーが予測スペースへダッシュ
+                // 1. レシーバーのダッシュ
                 this.tweens.add({
                     targets: this.receiver,
                     x: this.passTargetX, y: this.passTargetY,
                     duration: 1500, ease: 'Sine.easeInOut'
                 });
 
-                // 2. パサーがパターンの「強弱」に連動して運ぶドリブルで突進
+                // 2. パサーの「運ぶドリブル（前進突撃）」
+                const driveDistY = this.tacticalPattern.passer.y - this.tacticalPattern.driveY;
                 this.tweens.add({
                     targets: this.passer,
-                    y: this.tacticalPattern.passerDriveY, 
+                    y: this.tacticalPattern.driveY, 
                     duration: 600, ease: 'Quad.easeOut',
                     onUpdate: () => {
                         if (!this.hasJudged) this.ball.setPosition(this.passer.x, this.passer.y);
                     },
                     onComplete: () => {
                         if (this.hasJudged) return;
-                        // パターン固有の連動した強弱スルーパスを放つ
+                        // スルーパス発射
                         this.tweens.add({
                             targets: this.ball,
                             x: this.passTargetX, y: this.passTargetY,
@@ -735,54 +748,50 @@
                     }
                 });
 
-                // 3. 味方DF(青)が連動してプレス（釣りだされる）
+                // 3. 味方DFがパサーに釣られて飛び出す
                 this.tweens.add({
                     targets: this.dfPartner,
-                    x: this.passer.x, y: this.tacticalPattern.passerDriveY + 30,
+                    x: this.tacticalPattern.passer.x, y: this.tacticalPattern.driveY + 30,
                     duration: 550, ease: 'Quad.easeOut'
                 });
             }
 
             update(time, delta) {
                 this.dynamicBubbles.forEach(b => b.textObj.setPosition(b.target.x, b.target.y - 55));
-                this.countdownTime -= delta;
-
-                // 【予備動作アニメーションの完全修正】
+                
                 if (this.defenseState === 'COUNTDOWN') {
-                    let shakeX = 0;
-                    let shakeY = 0;
+                    this.countdownTime -= delta;
+                    let shakeX = 0; let shakeY = 0;
 
-                    // 残り1.2秒〜0.3秒の間：パターンの「強弱（インテンシティ）」に応じた細かな戦術ステップを踏む
+                    // カウントダウン中の強弱連動ステップ
                     if (this.countdownTime > 300) {
                         if (this.tacticalPattern.intensity === 'strong') {
-                            shakeX = Math.sin(time * 0.03) * 15; // 激しく大きなステップ
+                            shakeX = Math.sin(time * 0.03) * 15;
                             shakeY = Math.cos(time * 0.04) * 8;
                         } else if (this.tacticalPattern.intensity === 'medium') {
                             shakeX = Math.sin(time * 0.02) * 8;
-                            shakeY = Math.cos(time * 0.03) * 12; // 縦への推進ステップ
+                            shakeY = Math.cos(time * 0.03) * 12;
                         } else {
                             shakeX = Math.sin(time * 0.01) * 4;
-                            shakeY = -Math.abs(Math.cos(time * 0.02) * 10); // 手前に引くバックステップ
+                            shakeY = -Math.abs(Math.cos(time * 0.02) * 10);
                         }
                         this.receiver.setPosition(this.tacticalPattern.initX + shakeX, this.tacticalPattern.initY + shakeY);
                     }
-                    // 【最重要要望】：残り0.3秒以下（カウントダウンの最後の瞬間）
-                    // パスを出すターゲット方向に向かって明確に1歩強く踏み出す（最後動き出した方にパスが出る！）
+                    // 最後の0.3秒間：パスが出る方向（ターゲット）へ力強く1歩踏み出す！
                     else if (this.countdownTime <= 300 && this.countdownTime > 0) {
-                        const progress = (300 - this.countdownTime) / 300; // 0〜1への進捗
-                        // ターゲット方向へ約35ピクセルグッと体重を移動させる
-                        const stepX = Phaser.Math.Linear(this.tacticalPattern.initX, this.passTargetX, progress * 0.12);
-                        const stepY = Phaser.Math.Linear(this.tacticalPattern.initY, this.passTargetY, progress * 0.12);
+                        const progress = (300 - this.countdownTime) / 300;
+                        const stepX = Phaser.Math.Linear(this.tacticalPattern.initX, this.passTargetX, progress * 0.15);
+                        const stepY = Phaser.Math.Linear(this.tacticalPattern.initY, this.passTargetY, progress * 0.15);
                         this.receiver.setPosition(stepX, stepY);
                     }
                 }
 
-                // 毎フレーム安全なリアルタイムパスカット判定
+                // 【修正：シビア判定】カット範囲を 35 ➔ 18 に大幅縮小！真ん中棒立ちでは絶対届かない
                 if (this.defenseState === 'SIMULATING' && !this.hasJudged) {
                     const distToBall = Phaser.Math.Distance.Between(this.playerDF.x, this.playerDF.y, this.ball.x, this.ball.y);
-                    if (distToBall < 35) {
+                    if (distToBall < 18) { 
                         this.hasJudged = true;
-                        this.triggerResult(true, '✨ 見事なパスカット！\nおとりの突進に だまされず、\n最後の踏み込みを 完全に読んだ！');
+                        this.triggerResult(true, '✨ パスカット成功！\nねらわれた スペースを 完全に予測して\n身体を ドンピシャで 投げだした！');
                     }
                 }
             }
@@ -791,50 +800,82 @@
                 this.hasJudged = true;
                 const distToReceiver = Phaser.Math.Distance.Between(this.playerDF.x, this.playerDF.y, this.receiver.x, this.receiver.y);
 
-                if (distToReceiver < 65) {
+                // マークへのアプローチ成功判定（合格エリア）
+                if (distToReceiver < 55) {
                     if (Math.random() < 0.7) { 
-                        this.triggerResult(true, '⚔️ ナイスアプローチ！\n裏はとられたが すばやく寄せて、\n前を向かせずに ボールを奪った！');
+                        this.triggerResult(true, '⚔️ ボール奪取成功！\nパスは通されたが、トラップの瞬間に\nするどく寄せて 前を向かせなかった！');
                     } else {
-                        this.execOffenseGoalAnimation('😵 おしい！\nよせきれず かわされてしまった…');
+                        this.execOffenseGoalAnimation('😵 あと一歩…！\nよせきれず ターンされてしまった。');
                     }
                 } else {
-                    this.execOffenseGoalAnimation('❌ マークが とおすぎる！\nフリーで 崩されて シュートされた…');
+                    this.execOffenseGoalAnimation('❌ マークが遠すぎる！\nフリーで パスをうけられ、崩された。');
                 }
             }
 
             execOffenseGoalAnimation(msg) {
                 this.tweens.add({
                     targets: this.ball,
-                    x: 195, y: 30,
+                    x: 195, y: 80,
                     duration: 300, ease: 'Quad.easeIn',
                     onComplete: () => this.triggerResult(false, msg)
                 });
             }
 
+            // 【新規】やり直し・次に進む・やめるUIを完全搭載したリザルト処理
             triggerResult(isWin, message) {
                 this.defenseState = 'FINISHED';
                 this.tweens.killAll();
-                
-                const color = isWin ? '#2ecc71' : '#e74c3c';
-                this.add.rectangle(195, 450, 340, 130, 0x000000, 0.85).setDepth(9000).setStrokeStyle(3, color);
-                this.add.text(195, 450, message, {
-                    fontSize: '18px', color: '#fff', fontStyle: 'bold', align: 'center', lineHeight: 1.6
-                }).setOrigin(0.5).setDepth(9001);
+                this.clearSpeechBubbles();
 
-                this.time.delayedCall(3000, () => this.scene.restart());
+                const color = isWin ? '#2ecc71' : '#e74c3c';
+                
+                // 結果ボード
+                const boardBg = this.add.rectangle(195, 340, 340, 130, 0x000000, 0.9).setDepth(9000).setStrokeStyle(3, color);
+                const boardTxt = this.add.text(195, 340, message, {
+                    fontSize: '17px', color: '#fff', fontStyle: 'bold', align: 'center', lineHeight: 1.5
+                }).setOrigin(0.5).setDepth(9001);
+                this.uiElements.push(boardBg, boardTxt);
+
+                if (isWin) {
+                    this.cameras.main.flash(400, 46, 204, 113);
+                    
+                    let nextDefStage = this.currentDefStageNum + 1;
+                    if (nextDefStage <= 10) {
+                        StorageManager.updateHighestDefStage(nextDefStage);
+                        // 次のステージへ進むボタン
+                        this.addMenuButton(195, 470, '▶️ つぎのステージへ！', () => this.scene.restart({ stage: nextDefStage }));
+                    } else {
+                        // 10ステージ全面クリア時
+                        boardTxt.setText('🏆 祝・全10ステージ完全防衛！\nあなたは 最強のディリーダーだ！');
+                        StorageManager.updateHighestDefStage(1); // カウントをリセット
+                    }
+                    this.addMenuButton(195, 545, '🏠 おわる (タイトルへ)', () => this.scene.start('TitleScene'));
+                } else {
+                    this.cameras.main.shake(200, 0.01);
+                    // 失敗時：もういちど（リトライ）とやめるボタン
+                    this.addMenuButton(195, 470, '🔄 もういちど チャレンジ', () => this.scene.restart({ stage: this.currentDefStageNum }));
+                    this.addMenuButton(195, 545, '🏠 やめる (タイトルへ)', () => this.scene.start('TitleScene'));
+                }
             }
 
             showSpeechBubble(target, message) {
                 const bubble = this.add.text(target.x, target.y - 55, `💬 ${message}`, { 
-                    fontSize: '14px', color: '#000', backgroundColor: '#fff', padding: 4, fontStyle: 'bold'
+                    fontSize: '13px', color: '#000', backgroundColor: '#fff', padding: 4, fontStyle: 'bold'
                 }).setOrigin(0.5).setDepth(6000);
                 this.dynamicBubbles.push({ textObj: bubble, target: target });
             }
 
             clearSpeechBubbles() { this.dynamicBubbles.forEach(b => b.textObj.destroy()); this.dynamicBubbles = []; }
+            clearUI() { this.uiElements.forEach(e => e.destroy()); this.uiElements = []; }
+
+            addMenuButton(x, y, text, callback) {
+                const bg = this.add.rectangle(x, y, 280, 50, 0xffffff).setInteractive({ useHandCursor: true }).on('pointerdown', callback).setDepth(9100).setStrokeStyle(2, 0x333333);
+                const txt = this.add.text(x, y, text, { fontSize: '18px', color: '#222', fontStyle: 'bold' }).setOrigin(0.5).setDepth(9101);
+                this.uiElements.push(bg, txt);
+            }
 
             createVisualChar(x, y, color, name) {
-                const container = this.add.container(x, y);
+                const container = this.add.container(x, y).setDepth(1000);
                 const g = this.add.graphics();
                 g.fillStyle(color).lineStyle(2, 0xffffff).fillCircle(0, 0, 16).strokeCircle(0, 0, 16);
                 container.add(g);
