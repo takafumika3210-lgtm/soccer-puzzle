@@ -44,7 +44,6 @@
                     if (stageNum > current && stageNum <= 10) localStorage.setItem('soccer_highest_stage', stageNum);
                 } catch(e) {}
             },
-            // ディフェンス編用のステージ保存
             getHighestDefStage: () => { try { return parseInt(localStorage.getItem('soccer_highest_def_stage')) || 1; } catch(e) { return 1; } },
             updateHighestDefStage: (stageNum) => {
                 try {
@@ -68,7 +67,7 @@
             10: { player: { x: 195, y: 550 }, passer: { x: 80, y: 700 }, decoy: { x: 300, y: 700 }, enemies: [{ x: 130, y: 380 }, { x: 260, y: 380 }] }
         };
 
-        // 【新規】ディフェンス編用 10ステージ戦術配置設計（難易度連動・配置バラバラ）
+        // ディフェンス編用 10ステージ戦術配置設計
         const DEFENSE_STAGE_CONFIG = {
             1: { name: '中央から右へのスルーパス', passer: { x: 195, y: 680 }, receiver: { x: 140, y: 360 }, target: { x: 280, y: 320 }, speed: 900, driveY: 610, intensity: 'strong' },
             2: { name: '中央から左へのスルーパス', passer: { x: 195, y: 680 }, receiver: { x: 250, y: 360 }, target: { x: 110, y: 320 }, speed: 900, driveY: 610, intensity: 'strong' },
@@ -93,7 +92,6 @@
                 const highestStage = StorageManager.getHighestStage();
                 const highestDefStage = StorageManager.getHighestDefStage();
                 
-                // オフェンスボタン群
                 this.add.rectangle(195, 190, 320, 50, 0xf1c40f).setInteractive({ useHandCursor: true })
                     .on('pointerdown', () => this.scene.start('ReceiveScene', { stage: highestStage, mode: 'normal' }));
                 this.add.text(195, 190, `🏃 こうげき (ST ${highestStage} から)`, { fontSize: '18px', color: '#333', fontStyle: 'bold' }).setOrigin(0.5);
@@ -102,7 +100,6 @@
                     .on('pointerdown', () => this.scene.start('ReceiveScene', { stage: 1, mode: 'normal' }));
                 this.add.text(195, 255, '🔄 こうげき を はじめから', { fontSize: '18px', color: '#333', fontStyle: 'bold' }).setOrigin(0.5);
 
-                // 【拡張】ディフェンスボタン群
                 this.add.rectangle(195, 335, 320, 50, 0xe74c3c).setInteractive({ useHandCursor: true })
                     .on('pointerdown', () => this.scene.start('DefenseScene', { stage: highestDefStage }));
                 this.add.text(195, 335, `🛡️ まもり (ST ${highestDefStage} から)`, { fontSize: '18px', color: '#fff', fontStyle: 'bold' }).setOrigin(0.5);
@@ -130,7 +127,7 @@
             }
         }
 
-        // --- オフェンスモードシーン (完全維持) ---
+        // --- オフェンスモードシーン ---
         class ReceiveScene extends Phaser.Scene {
             constructor() { super('ReceiveScene'); }
 
@@ -629,19 +626,18 @@
             }
         }
 
-        // --- 【超絶進化版】ディフェンスモードシーン (10ステージ制・シビア判定・UI完備) ---
+        // --- ディフェンスモードシーン (完全修正・デバッグ済) ---
         class DefenseScene extends Phaser.Scene {
             constructor() { super('DefenseScene'); }
 
             init(data) {
-                // 現在のディフェンスステージ数をロード
                 this.currentDefStageNum = data ? (data.stage || 1) : 1;
                 this.tacticalPattern = DEFENSE_STAGE_CONFIG[this.currentDefStageNum] || DEFENSE_STAGE_CONFIG[1];
             }
 
             create() {
-                this.cameras.main.setBackgroundColor('#2c3e50'); // 守備編はダークグリーン芝
-                this.add.rectangle(195, 422, 390, 844, 0x27ae60).setDepth(0); // ピッチ色
+                this.cameras.main.setBackgroundColor('#2c3e50'); 
+                this.add.rectangle(195, 422, 390, 844, 0x27ae60).setDepth(0); 
 
                 this.defenseState = 'COUNTDOWN';
                 this.hasJudged = false;
@@ -663,18 +659,17 @@
                     .setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(9999)
                     .on('pointerdown', () => this.scene.start('TitleScene'));
 
-                this.passTargetX = this.tacticalPattern.targetX;
-                this.passTargetY = this.tacticalPattern.targetY;
+                // 【バグ修正】データマッピングのミスマッチを完全修正
+                this.passTargetX = this.tacticalPattern.target.x;
+                this.passTargetY = this.tacticalPattern.target.y;
 
-                // キャラクター初期配置（ステージごとにバラバラの位置！）
+                // キャラクター初期配置
                 this.passer = this.createVisualChar(this.tacticalPattern.passer.x, this.tacticalPattern.passer.y, 0xf1c40f, '⚽ パサー');
-                this.receiver = this.createVisualChar(this.tacticalPattern.initX, this.tacticalPattern.initY, 0xf1c40f, '🏃 レシーバー');
+                this.receiver = this.createVisualChar(this.tacticalPattern.receiver.x, this.tacticalPattern.receiver.y, 0xf1c40f, '🏃 レシーバー');
                 this.ball = this.add.circle(this.passer.x, this.passer.y, 8, 0xffffff).setDepth(5000);
 
-                // ディフェンダー（初期配置もパサーに合わせて変化）
                 this.dfPartner = this.createVisualChar(this.tacticalPattern.passer.x, this.tacticalPattern.passer.y - 90, 0x3498db, '👤 味方DF'); 
                 
-                // あなた（最初は半透明で、タップした場所に配置される）
                 this.playerDF = this.createVisualChar(195, 480, 0xe74c3c, '🛡️ あなた'); 
                 this.playerDF.setAlpha(0.2).setVisible(false);
 
@@ -694,6 +689,7 @@
                             this.defenseState = 'SELECTING';
                             this.playerDF.setVisible(true);
                             
+                            // 【修正】タイポ除去「まもる場所」
                             this.guideText = this.add.text(195, 150, '今のうごきだしから コースをよめ！\nまもる場所を タップで決定！', {
                                 fontSize: '18px', color: '#fff', backgroundColor: '#000', padding: 8, align: 'center', fontStyle: 'bold'
                             }).setOrigin(0.5);
@@ -702,7 +698,6 @@
                     }
                 });
 
-                // タップで守備位置決定
                 this.input.on('pointerdown', (pointer) => {
                     if (this.defenseState !== 'SELECTING' || pointer.y < 120 || pointer.y > 620) return;
                     
@@ -725,8 +720,7 @@
                     duration: 1500, ease: 'Sine.easeInOut'
                 });
 
-                // 2. パサーの「運ぶドリブル（前進突撃）」
-                const driveDistY = this.tacticalPattern.passer.y - this.tacticalPattern.driveY;
+                // 2. パサーの運ぶドリブル
                 this.tweens.add({
                     targets: this.passer,
                     y: this.tacticalPattern.driveY, 
@@ -736,11 +730,10 @@
                     },
                     onComplete: () => {
                         if (this.hasJudged) return;
-                        // スルーパス発射
                         this.tweens.add({
                             targets: this.ball,
                             x: this.passTargetX, y: this.passTargetY,
-                            duration: this.tacticalPattern.passSpeed, ease: 'Linear',
+                            duration: this.tacticalPattern.speed, ease: 'Linear',
                             onComplete: () => {
                                 if (!this.hasJudged) this.evaluateArrivalPhase();
                             }
@@ -748,7 +741,7 @@
                     }
                 });
 
-                // 3. 味方DFがパサーに釣られて飛び出す
+                // 3. 味方DFが連動してプレスに飛び出す
                 this.tweens.add({
                     targets: this.dfPartner,
                     x: this.tacticalPattern.passer.x, y: this.tacticalPattern.driveY + 30,
@@ -763,7 +756,7 @@
                     this.countdownTime -= delta;
                     let shakeX = 0; let shakeY = 0;
 
-                    // カウントダウン中の強弱連動ステップ
+                    // 【バグ修正】this.tacticalPattern.receiver.x / y を正しく計算に使用
                     if (this.countdownTime > 300) {
                         if (this.tacticalPattern.intensity === 'strong') {
                             shakeX = Math.sin(time * 0.03) * 15;
@@ -775,18 +768,18 @@
                             shakeX = Math.sin(time * 0.01) * 4;
                             shakeY = -Math.abs(Math.cos(time * 0.02) * 10);
                         }
-                        this.receiver.setPosition(this.tacticalPattern.initX + shakeX, this.tacticalPattern.initY + shakeY);
+                        this.receiver.setPosition(this.tacticalPattern.receiver.x + shakeX, this.tacticalPattern.receiver.y + shakeY);
                     }
-                    // 最後の0.3秒間：パスが出る方向（ターゲット）へ力強く1歩踏み出す！
+                    // 最後の0.3秒間でターゲットへ向かって一歩踏み出す
                     else if (this.countdownTime <= 300 && this.countdownTime > 0) {
                         const progress = (300 - this.countdownTime) / 300;
-                        const stepX = Phaser.Math.Linear(this.tacticalPattern.initX, this.passTargetX, progress * 0.15);
-                        const stepY = Phaser.Math.Linear(this.tacticalPattern.initY, this.passTargetY, progress * 0.15);
+                        const stepX = Phaser.Math.Linear(this.tacticalPattern.receiver.x, this.passTargetX, progress * 0.15);
+                        const stepY = Phaser.Math.Linear(this.tacticalPattern.receiver.y, this.passTargetY, progress * 0.15);
                         this.receiver.setPosition(stepX, stepY);
                     }
                 }
 
-                // 【修正：シビア判定】カット範囲を 35 ➔ 18 に大幅縮小！真ん中棒立ちでは絶対届かない
+                // リアルタイムパスカット判定（半径18pxの超精密・実戦仕様）
                 if (this.defenseState === 'SIMULATING' && !this.hasJudged) {
                     const distToBall = Phaser.Math.Distance.Between(this.playerDF.x, this.playerDF.y, this.ball.x, this.ball.y);
                     if (distToBall < 18) { 
@@ -800,7 +793,6 @@
                 this.hasJudged = true;
                 const distToReceiver = Phaser.Math.Distance.Between(this.playerDF.x, this.playerDF.y, this.receiver.x, this.receiver.y);
 
-                // マークへのアプローチ成功判定（合格エリア）
                 if (distToReceiver < 55) {
                     if (Math.random() < 0.7) { 
                         this.triggerResult(true, '⚔️ ボール奪取成功！\nパスは通されたが、トラップの瞬間に\nするどく寄せて 前を向かせなかった！');
@@ -821,7 +813,6 @@
                 });
             }
 
-            // 【新規】やり直し・次に進む・やめるUIを完全搭載したリザルト処理
             triggerResult(isWin, message) {
                 this.defenseState = 'FINISHED';
                 this.tweens.killAll();
@@ -829,7 +820,6 @@
 
                 const color = isWin ? '#2ecc71' : '#e74c3c';
                 
-                // 結果ボード
                 const boardBg = this.add.rectangle(195, 340, 340, 130, 0x000000, 0.9).setDepth(9000).setStrokeStyle(3, color);
                 const boardTxt = this.add.text(195, 340, message, {
                     fontSize: '17px', color: '#fff', fontStyle: 'bold', align: 'center', lineHeight: 1.5
@@ -842,17 +832,14 @@
                     let nextDefStage = this.currentDefStageNum + 1;
                     if (nextDefStage <= 10) {
                         StorageManager.updateHighestDefStage(nextDefStage);
-                        // 次のステージへ進むボタン
                         this.addMenuButton(195, 470, '▶️ つぎのステージへ！', () => this.scene.restart({ stage: nextDefStage }));
                     } else {
-                        // 10ステージ全面クリア時
-                        boardTxt.setText('🏆 祝・全10ステージ完全防衛！\nあなたは 最強のディリーダーだ！');
-                        StorageManager.updateHighestDefStage(1); // カウントをリセット
+                        boardTxt.setText('🏆 祝・全10ステージ完全防衛！\nあなたは 最強のディフェンダーだ！');
+                        StorageManager.updateHighestDefStage(1); 
                     }
                     this.addMenuButton(195, 545, '🏠 おわる (タイトルへ)', () => this.scene.start('TitleScene'));
                 } else {
                     this.cameras.main.shake(200, 0.01);
-                    // 失敗時：もういちど（リトライ）とやめるボタン
                     this.addMenuButton(195, 470, '🔄 もういちど チャレンジ', () => this.scene.restart({ stage: this.currentDefStageNum }));
                     this.addMenuButton(195, 545, '🏠 やめる (タイトルへ)', () => this.scene.start('TitleScene'));
                 }
