@@ -67,18 +67,18 @@
             10: { player: { x: 195, y: 550 }, passer: { x: 80, y: 700 }, decoy: { x: 300, y: 700 }, enemies: [{ x: 130, y: 380 }, { x: 260, y: 380 }] }
         };
 
-        // ディフェンス編用 10ステージ戦術配置設計
+        // 【拡張】ディフェンス編用 10ステージ配置設計（プレイヤーの初期位置 player もステージごとに最適化）
         const DEFENSE_STAGE_CONFIG = {
-            1: { name: '中央から右へのスルーパス', passer: { x: 195, y: 680 }, receiver: { x: 140, y: 360 }, target: { x: 280, y: 320 }, speed: 900, driveY: 610, intensity: 'strong' },
-            2: { name: '中央から左へのスルーパス', passer: { x: 195, y: 680 }, receiver: { x: 250, y: 360 }, target: { x: 110, y: 320 }, speed: 900, driveY: 610, intensity: 'strong' },
-            3: { name: '左サイドからの対角パス', passer: { x: 90, y: 660 }, receiver: { x: 150, y: 350 }, target: { x: 290, y: 290 }, speed: 850, driveY: 590, intensity: 'strong' },
-            4: { name: '右サイドからの対角パス', passer: { x: 300, y: 660 }, receiver: { x: 240, y: 350 }, target: { x: 100, y: 290 }, speed: 850, driveY: 590, intensity: 'strong' },
-            5: { name: '中央突破のショートくさび', passer: { x: 195, y: 700 }, receiver: { x: 195, y: 260 }, target: { x: 195, y: 430 }, speed: 1200, driveY: 640, intensity: 'weak' },
-            6: { name: '左サイド引きつけての縦突破', passer: { x: 80, y: 680 }, receiver: { x: 110, y: 380 }, target: { x: 80, y: 180 }, speed: 750, driveY: 600, intensity: 'medium' },
-            7: { name: '右サイド引きつけての縦突破', passer: { x: 310, y: 680 }, receiver: { x: 280, y: 380 }, target: { x: 310, y: 180 }, speed: 750, driveY: 600, intensity: 'medium' },
-            8: { name: '右ワイドからの内側カットイン', passer: { x: 320, y: 650 }, receiver: { x: 310, y: 320 }, target: { x: 170, y: 250 }, speed: 800, driveY: 580, intensity: 'strong' },
-            9: { name: '左ワイドからの内側カットイン', passer: { x: 70, y: 650 }, receiver: { x: 80, y: 320 }, target: { x: 220, y: 250 }, speed: 800, driveY: 580, intensity: 'strong' },
-            10: { name: '決戦：裏への超高速スルーパス', passer: { x: 150, y: 710 }, receiver: { x: 100, y: 340 }, target: { x: 300, y: 200 }, speed: 650, driveY: 620, intensity: 'strong' }
+            1: { name: '中央から右へのスルーパス', passer: { x: 195, y: 680 }, receiver: { x: 140, y: 360 }, player: { x: 195, y: 500 }, target: { x: 280, y: 320 }, speed: 900, driveY: 610, intensity: 'strong' },
+            2: { name: '中央から左へのスルーパス', passer: { x: 195, y: 680 }, receiver: { x: 250, y: 360 }, player: { x: 195, y: 500 }, target: { x: 110, y: 320 }, speed: 900, driveY: 610, intensity: 'strong' },
+            3: { name: '左サイドからの対角パス', passer: { x: 90, y: 660 }, receiver: { x: 150, y: 350 }, player: { x: 160, y: 520 }, target: { x: 290, y: 290 }, speed: 850, driveY: 590, intensity: 'strong' },
+            4: { name: '右サイドからの対角パス', passer: { x: 300, y: 660 }, receiver: { x: 240, y: 350 }, player: { x: 230, y: 520 }, target: { x: 100, y: 290 }, speed: 850, driveY: 590, intensity: 'strong' },
+            5: { name: '中央突破のショートくさび', passer: { x: 195, y: 700 }, receiver: { x: 195, y: 260 }, player: { x: 195, y: 480 }, target: { x: 195, y: 430 }, speed: 1200, driveY: 640, intensity: 'weak' },
+            6: { name: '左サイド引きつけての縦突破', passer: { x: 80, y: 680 }, receiver: { x: 110, y: 380 }, player: { x: 120, y: 500 }, target: { x: 80, y: 180 }, speed: 750, driveY: 600, intensity: 'medium' },
+            7: { name: '右サイド引きつけての縦突破', passer: { x: 310, y: 680 }, receiver: { x: 280, y: 380 }, player: { x: 260, y: 500 }, target: { x: 310, y: 180 }, speed: 750, driveY: 600, intensity: 'medium' },
+            8: { name: '右ワイドからの内側カットイン', passer: { x: 320, y: 650 }, receiver: { x: 310, y: 320 }, player: { x: 220, y: 460 }, target: { x: 170, y: 250 }, speed: 800, driveY: 580, intensity: 'strong' },
+            9: { name: '左ワイドからの内側カットイン', passer: { x: 70, y: 650 }, receiver: { x: 80, y: 320 }, player: { x: 170, y: 460 }, target: { x: 220, y: 250 }, speed: 800, driveY: 580, intensity: 'strong' },
+            10: { name: '決戦：裏への超高速スルーパス', passer: { x: 150, y: 710 }, receiver: { x: 100, y: 340 }, player: { x: 160, y: 490 }, target: { x: 300, y: 200 }, speed: 650, driveY: 620, intensity: 'strong' }
         };
 
         // --- タイトルシーン ---
@@ -127,7 +127,7 @@
             }
         }
 
-        // --- オフェンスモードシーン ---
+        // --- オフェンスモードシーン (完全維持) ---
         class ReceiveScene extends Phaser.Scene {
             constructor() { super('ReceiveScene'); }
 
@@ -626,7 +626,7 @@
             }
         }
 
-        // --- ディフェンスモードシーン (完全修正・デバッグ済) ---
+        // --- ディフェンスモードシーン (新・軌道描画等速移動システム) ---
         class DefenseScene extends Phaser.Scene {
             constructor() { super('DefenseScene'); }
 
@@ -659,21 +659,27 @@
                     .setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(9999)
                     .on('pointerdown', () => this.scene.start('TitleScene'));
 
-                // 【バグ修正】データマッピングのミスマッチを完全修正
                 this.passTargetX = this.tacticalPattern.target.x;
                 this.passTargetY = this.tacticalPattern.target.y;
 
-                // キャラクター初期配置
+                // キャラクター初期配置（最初から全員明示的に配置）
                 this.passer = this.createVisualChar(this.tacticalPattern.passer.x, this.tacticalPattern.passer.y, 0xf1c40f, '⚽ パサー');
                 this.receiver = this.createVisualChar(this.tacticalPattern.receiver.x, this.tacticalPattern.receiver.y, 0xf1c40f, '🏃 レシーバー');
                 this.ball = this.add.circle(this.passer.x, this.passer.y, 8, 0xffffff).setDepth(5000);
 
                 this.dfPartner = this.createVisualChar(this.tacticalPattern.passer.x, this.tacticalPattern.passer.y - 90, 0x3498db, '👤 味方DF'); 
                 
-                this.playerDF = this.createVisualChar(195, 480, 0xe74c3c, '🛡️ あなた'); 
-                this.playerDF.setAlpha(0.2).setVisible(false);
+                // 【要望：最初から明示】あなたの初期配置をステージ設定から読み込み、100%表示
+                this.playerDF = this.createVisualChar(this.tacticalPattern.player.x, this.tacticalPattern.player.y, 0xe74c3c, '🛡️ あなた'); 
+                this.playerDF.setAlpha(1.0).setVisible(true);
 
                 this.showSpeechBubble(this.receiver, 'ヘイ！パス！');
+
+                // 軌道描画用のグラフィックス・パス配列の初期化
+                this.graphics = this.add.graphics();
+                this.uiElements.push(this.graphics);
+                this.pathPoints = [];
+                this.isDrawing = false;
 
                 // カウントダウンUI
                 this.cdText = this.add.text(195, 260, '3', { fontSize: '90px', color: '#fff', fontStyle: 'bold' }).setOrigin(0.5).setDepth(9000);
@@ -686,32 +692,86 @@
                             this.cdText.setText(count.toString());
                         } else {
                             this.cdText.destroy();
-                            this.defenseState = 'SELECTING';
-                            this.playerDF.setVisible(true);
+                            this.defenseState = 'PLANNING'; // SELECTINGからPLANNING(描画受付)へ
                             
-                            // 【修正】タイポ除去「まもる場所」
-                            this.guideText = this.add.text(195, 150, '今のうごきだしから コースをよめ！\nまもる場所を タップで決定！', {
-                                fontSize: '18px', color: '#fff', backgroundColor: '#000', padding: 8, align: 'center', fontStyle: 'bold'
+                            this.guideText = this.add.text(195, 150, 'あなたのアイコンから 守るみちをかいて！\n指をはなすと 試合がスタート！', {
+                                fontSize: '17px', color: '#fff', backgroundColor: '#000', padding: 8, align: 'center', fontStyle: 'bold'
                             }).setOrigin(0.5);
                         }
                         count--;
                     }
                 });
 
+                // 【要望：動きの軌道を描く】ディフェンス編用ドラッグ入力システムの構築
+                this.setupDefenseInput();
+            }
+
+            setupDefenseInput() {
                 this.input.on('pointerdown', (pointer) => {
-                    if (this.defenseState !== 'SELECTING' || pointer.y < 120 || pointer.y > 620) return;
+                    if (this.defenseState !== 'PLANNING') return;
                     
-                    this.playerDF.setPosition(pointer.x, pointer.y);
-                    this.playerDF.setAlpha(1.0);
-                    
-                    if (this.guideText) this.guideText.destroy();
-                    this.clearSpeechBubbles();
-                    this.startTacticalSimulation();
+                    // あなたのアイコンの近くをタップした時だけ描画を許可
+                    const dist = Phaser.Math.Distance.Between(this.playerDF.x, this.playerDF.y, pointer.x, pointer.y);
+                    if (dist < 45) {
+                        this.isDrawing = true;
+                        this.pathPoints = [{ x: this.playerDF.x, y: this.playerDF.y }];
+                    }
                 });
+
+                this.input.on('pointermove', (pointer) => {
+                    if (this.isDrawing && this.defenseState === 'PLANNING') {
+                        const last = this.pathPoints[this.pathPoints.length - 1];
+                        if (Phaser.Math.Distance.Between(last.x, last.y, pointer.x, pointer.y) > 8) {
+                            this.pathPoints.push({ x: pointer.x, y: pointer.y });
+                            this.drawDefensePath();
+                        }
+                    }
+                });
+
+                this.input.on('pointerup', () => {
+                    if (this.isDrawing && this.defenseState === 'PLANNING') {
+                        this.isDrawing = false;
+                        // 描いた軌道の長さが十分であればシミュレーション始動
+                        if (this.pathPoints.length > 3) {
+                            if (this.guideText) this.guideText.destroy();
+                            this.clearSpeechBubbles();
+                            this.startTacticalSimulation();
+                        }
+                    }
+                });
+            }
+
+            drawDefensePath() {
+                this.graphics.clear().lineStyle(5, 0xe74c3c, 0.7).beginPath().moveTo(this.pathPoints[0].x, this.pathPoints[0].y);
+                this.pathPoints.forEach(p => this.graphics.lineTo(p.x, p.y));
+                this.graphics.strokePath();
             }
 
             startTacticalSimulation() {
                 this.defenseState = 'SIMULATING';
+
+                // 【要望：パスと同時にアイコンも動く＆スピード等速化】
+                let pathLength = 0;
+                for(let i=0; i<this.pathPoints.length-1; i++){
+                    pathLength += Phaser.Math.Distance.Between(this.pathPoints[i].x, this.pathPoints[i].y, this.pathPoints[i+1].x, this.pathPoints[i+1].y);
+                }
+                
+                // 敵（オフェンス編の👿敵）の移動スピード 79px/秒 と完全同期
+                const playerSpeed = 79; 
+                const duration = pathLength === 0 ? 100 : (pathLength / playerSpeed) * 1000;
+
+                const curve = new Phaser.Curves.Spline(this.pathPoints);
+
+                // あなたの等速ライン追従Tween
+                this.tweens.addCounter({
+                    from: 0, to: 1,
+                    duration: duration,
+                    onUpdate: (tw) => {
+                        if (this.defenseState !== 'SIMULATING') return;
+                        const p = curve.getPoint(tw.getValue());
+                        this.playerDF.setPosition(p.x, p.y);
+                    }
+                });
 
                 // 1. レシーバーのダッシュ
                 this.tweens.add({
@@ -720,7 +780,7 @@
                     duration: 1500, ease: 'Sine.easeInOut'
                 });
 
-                // 2. パサーの運ぶドリブル
+                // 2. パサーの運ぶドリブルとパス
                 this.tweens.add({
                     targets: this.passer,
                     y: this.tacticalPattern.driveY, 
@@ -741,7 +801,7 @@
                     }
                 });
 
-                // 3. 味方DFが連動してプレスに飛び出す
+                // 3. 味方DFが連動して前に釣り出される
                 this.tweens.add({
                     targets: this.dfPartner,
                     x: this.tacticalPattern.passer.x, y: this.tacticalPattern.driveY + 30,
@@ -756,7 +816,6 @@
                     this.countdownTime -= delta;
                     let shakeX = 0; let shakeY = 0;
 
-                    // 【バグ修正】this.tacticalPattern.receiver.x / y を正しく計算に使用
                     if (this.countdownTime > 300) {
                         if (this.tacticalPattern.intensity === 'strong') {
                             shakeX = Math.sin(time * 0.03) * 15;
@@ -770,7 +829,6 @@
                         }
                         this.receiver.setPosition(this.tacticalPattern.receiver.x + shakeX, this.tacticalPattern.receiver.y + shakeY);
                     }
-                    // 最後の0.3秒間でターゲットへ向かって一歩踏み出す
                     else if (this.countdownTime <= 300 && this.countdownTime > 0) {
                         const progress = (300 - this.countdownTime) / 300;
                         const stepX = Phaser.Math.Linear(this.tacticalPattern.receiver.x, this.passTargetX, progress * 0.15);
@@ -779,12 +837,12 @@
                     }
                 }
 
-                // リアルタイムパスカット判定（半径18pxの超精密・実戦仕様）
+                // 移動中のリアルタイム精密パスカット判定（半径18px）
                 if (this.defenseState === 'SIMULATING' && !this.hasJudged) {
                     const distToBall = Phaser.Math.Distance.Between(this.playerDF.x, this.playerDF.y, this.ball.x, this.ball.y);
                     if (distToBall < 18) { 
                         this.hasJudged = true;
-                        this.triggerResult(true, '✨ パスカット成功！\nねらわれた スペースを 完全に予測して\n身体を ドンピシャで 投げだした！');
+                        this.triggerResult(true, '✨ パスカット成功！\n無駄のない 最短ルートをえがき、\nパスコースを ドンピシャで ふさいだ！');
                     }
                 }
             }
@@ -795,12 +853,12 @@
 
                 if (distToReceiver < 55) {
                     if (Math.random() < 0.7) { 
-                        this.triggerResult(true, '⚔️ ボール奪取成功！\nパスは通されたが、トラップの瞬間に\nするどく寄せて 前を向かせなかった！');
+                        this.triggerResult(true, '⚔️ ボール奪取成功！\n移動ルートの 先読みが 的確だったため、\nトラップぎわですするどく 奪いとった！');
                     } else {
                         this.execOffenseGoalAnimation('😵 あと一歩…！\nよせきれず ターンされてしまった。');
                     }
                 } else {
-                    this.execOffenseGoalAnimation('❌ マークが遠すぎる！\nフリーで パスをうけられ、崩された。');
+                    this.execOffenseGoalAnimation('❌ マークが遠すぎる！\n移動が間に合わず、フリーで崩された。');
                 }
             }
 
