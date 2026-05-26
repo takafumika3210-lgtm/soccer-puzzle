@@ -51,7 +51,6 @@
                     if (stageNum > current && stageNum <= 10) localStorage.setItem('soccer_highest_def_stage', stageNum);
                 } catch(e) {}
             },
-            // 【新規】ディフェンス編用のお気に入りデータ管理
             getSavedDef: () => { try { return JSON.parse(localStorage.getItem('soccer_puzzle_saved_def_stages')) || []; } catch(e) { return []; } },
             toggleSaveDef: (stageNum) => {
                 try {
@@ -101,10 +100,11 @@
                 this.add.text(195, 80, 'サッカー パズル！', { fontSize: '38px', color: '#ffffff', fontStyle: 'bold' }).setOrigin(0.5);
                 
                 if (!this.registry.has('stamps')) this.registry.set('stamps', 0);
+                if (!this.registry.has('def_stamps')) this.registry.set('def_stamps', 0); // まもり用スタンプ初期化
+                
                 const highestStage = StorageManager.getHighestStage();
                 const highestDefStage = StorageManager.getHighestDefStage();
                 
-                // オフェンスボタン群
                 this.add.rectangle(195, 175, 320, 45, 0xf1c40f).setInteractive({ useHandCursor: true })
                     .on('pointerdown', () => this.scene.start('ReceiveScene', { stage: highestStage, mode: 'normal' }));
                 this.add.text(195, 175, `🏃 こうげき (ST ${highestStage} から)`, { fontSize: '18px', color: '#333', fontStyle: 'bold' }).setOrigin(0.5);
@@ -113,7 +113,6 @@
                     .on('pointerdown', () => this.scene.start('ReceiveScene', { stage: 1, mode: 'normal' }));
                 this.add.text(195, 230, '🔄 こうげき を はじめから', { fontSize: '18px', color: '#333', fontStyle: 'bold' }).setOrigin(0.5);
 
-                // ディフェンスボタン群
                 this.add.rectangle(195, 305, 320, 45, 0xe74c3c).setInteractive({ useHandCursor: true })
                     .on('pointerdown', () => this.scene.start('DefenseScene', { stage: highestDefStage, mode: 'normal' }));
                 this.add.text(195, 305, `🛡️ まもり (ST ${highestDefStage} から)`, { fontSize: '18px', color: '#fff', fontStyle: 'bold' }).setOrigin(0.5);
@@ -126,7 +125,6 @@
             }
 
             drawSavedStages() {
-                // こうげきのお気に入り表示
                 const saved = StorageManager.getSaved();
                 this.add.text(195, 440, '⭐ お気に入り (こうげき)', { fontSize: '16px', color: '#ffffff', fontStyle: 'bold' }).setOrigin(0.5);
                 if (saved.length === 0) {
@@ -141,7 +139,6 @@
                     });
                 }
 
-                // 【新規】まもりのお気に入り表示
                 const savedDef = StorageManager.getSavedDef();
                 this.add.text(195, 580, '⭐ お気に入り (まもり)', { fontSize: '16px', color: '#ffffff', fontStyle: 'bold' }).setOrigin(0.5);
                 if (savedDef.length === 0) {
@@ -657,7 +654,7 @@
             }
         }
 
-        // --- ディフェンスモードシーン (軌道移動・10ステージ制・お気に入り・守備範囲1.1倍) ---
+        // --- ディフェンスモードシーン (新・フォグ索敵＆スタンプ・ステージ表記完全同期) ---
         class DefenseScene extends Phaser.Scene {
             constructor() { super('DefenseScene'); }
 
@@ -665,6 +662,7 @@
                 this.currentDefStageNum = data ? (data.stage || 1) : 1;
                 this.playMode = data ? (data.mode || 'normal') : 'normal';
                 this.tacticalPattern = DEFENSE_STAGE_CONFIG[this.currentDefStageNum] || DEFENSE_STAGE_CONFIG[1];
+                this.defStamps = this.registry.get('def_stamps') || 0;
             }
 
             create() {
@@ -691,7 +689,7 @@
                     .setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(9999)
                     .on('pointerdown', () => this.scene.start('TitleScene'));
 
-                // 【新規】ディフェンス編用お気に入り保存ボタン
+                // お気に入り保存ボタン
                 const isSaved = StorageManager.getSavedDef().includes(this.currentDefStageNum);
                 this.saveBtn = this.add.text(320, 25, isSaved ? '⭐ 保存済' : '☆ 保存', { fontSize: '14px', color: isSaved ? '#f1c40f' : '#ffffff', fontStyle: 'bold', backgroundColor: '#333', padding: 6 })
                     .setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(9999)
@@ -703,11 +701,10 @@
                 this.passTargetX = this.tacticalPattern.target.x;
                 this.passTargetY = this.tacticalPattern.target.y;
 
-                // キャラクター初期配置
+                // キャラクター初期配置（あなたを含め全員配置）
                 this.passer = this.createVisualChar(this.tacticalPattern.passer.x, this.tacticalPattern.passer.y, 0xf1c40f, '⚽ パサー');
                 this.receiver = this.createVisualChar(this.tacticalPattern.receiver.x, this.tacticalPattern.receiver.y, 0xf1c40f, '🏃 レシーバー');
                 this.ball = this.add.circle(this.passer.x, this.passer.y, 8, 0xffffff).setDepth(5000);
-
                 this.dfPartner = this.createVisualChar(this.tacticalPattern.passer.x, this.tacticalPattern.passer.y - 90, 0x3498db, '👤 味方DF'); 
                 
                 this.playerDF = this.createVisualChar(this.tacticalPattern.player.x, this.tacticalPattern.player.y, 0xe74c3c, '🛡️ あなた'); 
@@ -715,37 +712,67 @@
 
                 this.showSpeechBubble(this.receiver, 'ヘイ！パス！');
 
+                // 【要望：敵が見えない状態から開始】オフェンス編と同じくフォグシステムを適用
+                this.fog = this.add.renderTexture(0, 0, 390, 844).setOrigin(0, 0).setDepth(4500);
+                this.fog.fill(0x000000, 0.95);
+                
+                if (!this.textures.exists('brushTexDef')) {
+                    const brushGraphic = this.make.graphics({ x: 0, y: 0, add: false });
+                    brushGraphic.fillStyle(0xffffff, 1).fillCircle(60, 60, 60);
+                    brushGraphic.generateTexture('brushTexDef', 120, 120);
+                    brushGraphic.destroy();
+                }
+                this.brush = this.make.image({ x: 0, y: 0, key: 'brushTexDef', add: false });
+
                 this.graphics = this.add.graphics();
                 this.uiElements.push(this.graphics);
                 this.pathPoints = [];
                 this.isDrawing = false;
 
                 // カウントダウンUI
-                this.cdText = this.add.text(195, 260, '3', { fontSize: '90px', color: '#fff', fontStyle: 'bold' }).setOrigin(0.5).setDepth(9000);
+                this.cdBg = this.add.rectangle(195, 422, 390, 844, 0x000000, 0.3).setDepth(5999);
+                this.cdText = this.add.text(195, 260, `ステージ ${this.currentDefStageNum}\n\nがめんを こすって\nあいて を さがそう！`, { fontSize: '24px', color: '#fff', fontStyle: 'bold', align: 'center' }).setOrigin(0.5).setDepth(6000);
                 
-                let count = 2;
+                let count = 3;
                 this.time.addEvent({
-                    delay: 1000, repeat: 2,
+                    delay: 1000, repeat: 4,
                     callback: () => {
                         if (count > 0) {
-                            this.cdText.setText(count.toString());
+                            this.cdText.setText(count.toString()).setFontSize('90px');
+                        } else if (count === 0) {
+                            this.cdText.setText('GO!').setFontSize('80px').setColor('#ff0');
                         } else {
-                            this.cdText.destroy();
+                            this.cdText.destroy(); this.cdBg.destroy();
                             this.defenseState = 'PLANNING'; 
                             
-                            this.guideText = this.add.text(195, 150, 'あなたのアイコンから 守るみちをかいて！\n指をはなすと 試合がスタート！', {
+                            this.guideText = this.add.text(195, 140, 'あなたのアイコンから 守るみちをかいて！\n指をはなすと 試合がスタート！', {
                                 fontSize: '17px', color: '#fff', backgroundColor: '#000', padding: 8, align: 'center', fontStyle: 'bold'
-                            }).setOrigin(0.5);
+                            }).setOrigin(0.5).setDepth(6000);
                         }
                         count--;
                     }
                 });
 
                 this.setupDefenseInput();
+                
+                // 【要望】通常モードプレイ時、下部にスタンプカードを表示
+                if (this.playMode === 'normal') this.drawStampBook();
+            }
+
+            // 【要望】まもり編専用スタンプカード描画システム
+            drawStampBook() {
+                this.add.rectangle(195, 780, 360, 80, 0xffffff, 0.95).setDepth(8000).setStrokeStyle(4, 0xe74c3c);
+                this.add.text(195, 755, '🛡️ まもり編 スタンプカード 🛡️', {fontSize: '14px', color: '#c0392b', fontStyle: 'bold'}).setOrigin(0.5).setDepth(8001);
+                for (let i = 0; i < 5; i++) {
+                    const cx = 75 + (i * 60);
+                    this.add.circle(cx, 790, 22, 0xecf0f1, 1).setDepth(8001).setStrokeStyle(2, 0xbdc3c7);
+                    if (i < this.defStamps) this.add.text(cx, 790, '🛡️', {fontSize: '24px'}).setOrigin(0.5).setDepth(8002);
+                }
             }
 
             setupDefenseInput() {
                 this.input.on('pointerdown', (pointer) => {
+                    this.updateVision(pointer.x, pointer.y);
                     if (this.defenseState !== 'PLANNING') return;
                     
                     const dist = Phaser.Math.Distance.Between(this.playerDF.x, this.playerDF.y, pointer.x, pointer.y);
@@ -756,6 +783,8 @@
                 });
 
                 this.input.on('pointermove', (pointer) => {
+                    if (pointer.isDown) this.updateVision(pointer.x, pointer.y);
+                    
                     if (this.isDrawing && this.defenseState === 'PLANNING') {
                         const last = this.pathPoints[this.pathPoints.length - 1];
                         if (Phaser.Math.Distance.Between(last.x, last.y, pointer.x, pointer.y) > 8) {
@@ -771,10 +800,21 @@
                         if (this.pathPoints.length > 3) {
                             if (this.guideText) this.guideText.destroy();
                             this.clearSpeechBubbles();
+                            
+                            // 試合開始時に残っている霧を完全にフェードアウト消去
+                            if (this.fog) {
+                                this.tweens.add({ targets: this.fog, alpha: 0, duration: 200, onComplete: () => this.fog.destroy() });
+                            }
                             this.startTacticalSimulation();
                         }
                     }
                 });
+            }
+
+            updateVision(x, y) {
+                if ((this.defenseState === 'COUNTDOWN' || this.defenseState === 'PLANNING') && this.fog && this.fog.active) {
+                    this.brush.setPosition(x, y); this.fog.erase(this.brush);
+                }
             }
 
             drawDefensePath() {
@@ -806,14 +846,12 @@
                     }
                 });
 
-                // 1. レシーバーのダッシュ
                 this.tweens.add({
                     targets: this.receiver,
                     x: this.passTargetX, y: this.passTargetY,
                     duration: 1500, ease: 'Sine.easeInOut'
                 });
 
-                // 2. パサーの運ぶドリブルとパス
                 this.tweens.add({
                     targets: this.passer,
                     y: this.tacticalPattern.driveY, 
@@ -834,7 +872,6 @@
                     }
                 });
 
-                // 3. 味方DFが連動して前に釣り出される
                 this.tweens.add({
                     targets: this.dfPartner,
                     x: this.tacticalPattern.passer.x, y: this.tacticalPattern.driveY + 30,
@@ -870,7 +907,7 @@
                     }
                 }
 
-                // 【要望：守備範囲1.1倍】パスカット判定の半径を18pxから20pxへ拡張！
+                // 守備範囲1.1倍（半径20px）の精密ヒット判定
                 if (this.defenseState === 'SIMULATING' && !this.hasJudged) {
                     const distToBall = Phaser.Math.Distance.Between(this.playerDF.x, this.playerDF.y, this.ball.x, this.ball.y);
                     if (distToBall < 20) { 
@@ -904,7 +941,7 @@
                 });
             }
 
-            // 【拡張】お気に入りモード・通常モードを完全に考慮したリザルトシステム
+            // 【要望：クリア時のスタンプシステム】
             triggerResult(isWin, message) {
                 this.defenseState = 'FINISHED';
                 this.tweens.killAll();
@@ -921,19 +958,26 @@
                 if (isWin) {
                     this.cameras.main.flash(400, 46, 204, 113);
                     
-                    let nextDefStage = this.currentDefStageNum + 1;
-                    if (this.playMode === 'saved') {
-                        // お気に入りから単発起動された場合
-                        this.addMenuButton(195, 470, '🏠 タイトルへもどる', () => this.scene.start('TitleScene'));
-                    } else if (nextDefStage <= 10) {
+                    let nextDefStage = this.currentDefStageNum;
+                    if (this.playMode === 'normal') {
+                        nextDefStage = DEFENSE_STAGE_CONFIG[this.currentDefStageNum + 1] ? this.currentDefStageNum + 1 : 1;
                         StorageManager.updateHighestDefStage(nextDefStage);
-                        this.addMenuButton(195, 470, '▶️ つぎのステージへ！', () => this.scene.restart({ stage: nextDefStage, mode: 'normal' }));
-                    } else {
-                        boardTxt.setText('🏆 祝・まもり編 10ステージ完全防衛！\nあなたは 最強のディフェンダーだ！');
-                        StorageManager.updateHighestDefStage(1); 
+                        
+                        // まもりスタンプの加算処理
+                        this.defStamps += 1;
+                        let isCardFull = (this.defStamps >= 5);
+                        if (isCardFull) {
+                            boardTxt.setText('👑 まもり編カード コンプリート！\nおめでとう！鉄壁のディフェンダーだ！');
+                            this.registry.set('def_stamps', 0);
+                        } else {
+                            this.registry.set('def_stamps', this.defStamps);
+                        }
                     }
-                    
-                    if (this.playMode !== 'saved') {
+
+                    if (this.playMode === 'saved') {
+                        this.addMenuButton(195, 470, '🏠 タイトルへもどる', () => this.scene.start('TitleScene'));
+                    } else {
+                        this.addMenuButton(195, 470, '▶️ つぎのステージへ！', () => this.scene.restart({ stage: nextDefStage, mode: 'normal' }));
                         this.addMenuButton(195, 545, '🏠 おわる (タイトルへ)', () => this.scene.start('TitleScene'));
                     }
                 } else {
@@ -946,7 +990,7 @@
             showSpeechBubble(target, message) {
                 const bubble = this.add.text(target.x, target.y - 55, `💬 ${message}`, { 
                     fontSize: '13px', color: '#000', backgroundColor: '#fff', padding: 4, fontStyle: 'bold'
-                }).setOrigin(0.5).setDepth(6000);
+                }).setOrigin(0.5).setDepth(4000); // フォグの下（4000）に配置して霧の向こうで喋らせる
                 this.dynamicBubbles.push({ textObj: bubble, target: target });
             }
 
